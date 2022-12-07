@@ -904,24 +904,30 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshState> mesh_items, Array &mesh_to_index_to_material, Vector<Ref<Material> > &material_cache) {
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
-		array_mesh->lightmap_unwrap(Transform3D(), 2.0f, true);
-
-		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
-			Array mesh = array_mesh->surface_get_arrays(j);
-			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
-			Ref<Material> mat = mesh_items[mesh_i].mesh->surface_get_material(j);
-			if (mesh_items[mesh_i].mesh_instance->get_active_material(j).is_valid()) {
-				mat = mesh_items[mesh_i].mesh_instance->get_active_material(j);
+		List<MethodInfo> methods;
+		array_mesh->get_method_list(&methods);
+		for (MethodInfo method : methods) {
+			if (method.name != "lightmap_unwrap") {
+				continue;
 			}
-			if (material_cache.find(mat) == -1) {
-				material_cache.push_back(mat);
+			array_mesh->call("lightmap_unwrap", 2.0f, true);
+			for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
+				Array mesh = array_mesh->surface_get_arrays(j);
+				Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
+				Ref<Material> mat = mesh_items[mesh_i].mesh->surface_get_material(j);
+				if (mesh_items[mesh_i].mesh_instance->get_active_material(j).is_valid()) {
+					mat = mesh_items[mesh_i].mesh_instance->get_active_material(j);
+				}
+				if (material_cache.find(mat) == -1) {
+					material_cache.push_back(mat);
+				}
+				Array materials;
+				materials.resize(indices.size());
+				for (int32_t index_i = 0; index_i < indices.size(); index_i++) {
+					materials[index_i] = mat;
+				}
+				mesh_to_index_to_material.push_back(materials);
 			}
-			Array materials;
-			materials.resize(indices.size());
-			for (int32_t index_i = 0; index_i < indices.size(); index_i++) {
-				materials[index_i] = mat;
-			}
-			mesh_to_index_to_material.push_back(materials);
 		}
 	}
 }
@@ -1075,7 +1081,6 @@ void SceneMergePlugin::merge() {
 	}
 	file_export_lib->set_current_file(filename + String(".scn"));
 }
-
 void SceneMergePlugin::_dialog_action(String p_file) {
 	Node *node = EditorNode::get_singleton()->get_tree()->get_edited_scene_root();
 	if (!node) {
