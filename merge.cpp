@@ -113,7 +113,11 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 
 void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner) {
 	MeshInstance3D *mi = cast_to<MeshInstance3D>(p_current_node);
-	if (mi && mi->get_mesh().is_valid()) {
+	bool is_valid = false;
+	if (mi) {
+		is_valid = true;
+	}
+	if (is_valid && mi->get_mesh().is_valid()) {
 		bool has_blends = false;
 		bool has_bones = false;
 		bool has_transparency = false;
@@ -123,8 +127,7 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 			Array bones = array[ArrayMesh::ARRAY_BONES];
 			has_bones |= bones.size() != 0;
 			has_blends |= array_mesh->get_blend_shape_count() != 0;
-			Ref<Material> mat = mi->get_active_material(surface_i);
-			Ref<BaseMaterial3D> base_mat = mat;
+			Ref<BaseMaterial3D> base_mat = array_mesh->surface_get_material(surface_i);
 			if (base_mat.is_valid()) {
 				Ref<Image> albedo_img = base_mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
 				has_transparency |= base_mat->get_transparency() != BaseMaterial3D::TRANSPARENCY_DISABLED;
@@ -215,7 +218,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String
 	_find_all_mesh_instances(mesh_merge_state.original_mesh_items, p_original_root, p_original_root);
 	_find_all_animated_meshes(mesh_merge_state.original_mesh_items, p_original_root, p_original_root);
 	if (mesh_merge_state.original_mesh_items.size() != mesh_merge_state.mesh_items.size()) {
-		return p_original_root;
+		return p_root;
 	}
 
 	for (int32_t items_i = 0; items_i < mesh_merge_state.mesh_items.size(); items_i++) {
@@ -833,21 +836,28 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 					break;
 				}
 				Array index_to_material = r_mesh_to_index_to_material[mesh_count];
-				int32_t index = indices.find(vertex_i);
-				Ref<Material> material;
-				if (index >= 0 && index < index_to_material.size()) {
-					material = index_to_material.get(index);
-				} else {
+				if (!index_to_material.size()) {
 					continue;
 				}
+				int32_t index = indices.find(vertex_i);
+				if (index >= index_to_material.size()) {
+					continue;
+				}
+				ERR_CONTINUE(index == -1);
+				const Ref<Material> material = index_to_material.get(index);
+				if (material.is_null()) {
+					uvs.resize(0);
+					continue;
+				}
+				Ref<BaseMaterial3D> Node3D_material = material;
+				if (Node3D_material.is_null()) {
+					continue;
+				}
+				const Ref<Texture2D> tex = Node3D_material->get_texture(BaseMaterial3D::TextureParam::TEXTURE_ALBEDO);
 				uvs.write[vertex_i] = r_model_vertices[mesh_count][vertex_i].uv;
-				Ref<BaseMaterial3D> node3d_material = material;
-				if (node3d_material.is_valid()) {
-					Ref<Texture2D> tex = node3d_material->get_texture(BaseMaterial3D::TextureParam::TEXTURE_ALBEDO);
-					if (tex.is_valid()) {
-						uvs.write[vertex_i].x *= tex->get_width();
-						uvs.write[vertex_i].y *= tex->get_height();
-					}
+				if (tex.is_valid()) {
+					uvs.write[vertex_i].x *= tex->get_width();
+					uvs.write[vertex_i].y *= tex->get_height();
 				}
 			}
 			uv_groups.push_back(uvs);
