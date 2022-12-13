@@ -169,7 +169,7 @@ private:
 		uint32_t atlas_width = 0;
 	};
 
-	const int32_t default_texture_length = 512;
+	const int32_t default_texture_length = 128;
 
 	struct ModelVertex {
 		Vector3 pos;
