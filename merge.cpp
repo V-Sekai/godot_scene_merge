@@ -250,8 +250,6 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 	Vector<MeshState> original_mesh_items = p_mesh_merge_state.original_mesh_items[p_index].meshes;
 	Array mesh_to_index_to_material;
 	Vector<Ref<Material> > material_cache;
-	Ref<Material> empty_material;
-	material_cache.push_back(empty_material);
 	map_mesh_to_index_to_material(mesh_items, mesh_to_index_to_material, material_cache);
 
 	Vector<Vector<Vector2> > uv_groups;
@@ -289,14 +287,11 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 	EditorProgress progress_scene_merge("gen_get_source_material", TTR("Get source material"), state.material_cache.size());
 	int step = 0;
 #endif
-	for (int32_t material_cache_i = 0; material_cache_i < state.material_cache.size(); material_cache_i++) {
+	for (Ref<Material> abstract_material : state.material_cache) {
 #ifdef TOOLS_ENABLED
 		step++;
 #endif
-		Ref<BaseMaterial3D> material = state.material_cache[material_cache_i];
-		if (material.is_null()) {
-			continue;
-		}
+		Ref<BaseMaterial3D> material = abstract_material;
 		if (material->get_texture(BaseMaterial3D::TEXTURE_ALBEDO).is_null()) {
 			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 			img->fill(material->get_albedo());
@@ -370,7 +365,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 		cache.emission_img = _get_source_texture(state, material, "emission");
 		cache.normal_img = _get_source_texture(state, material, "normal");
 		cache.orm_img = _get_source_texture(state, material, "orm");
-		state.material_image_cache[material_cache_i] = cache;
+		state.material_image_cache[state.material_cache.find(abstract_material)] = cache;
 #ifdef TOOLS_ENABLED
 		progress_scene_merge.step(TTR("Getting Source Material: ") + material->get_name() + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
 #endif
@@ -379,7 +374,10 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 	_generate_texture_atlas(state, "emission");
 	_generate_texture_atlas(state, "normal");
 	_generate_texture_atlas(state, "orm");
-	ERR_FAIL_COND_V(state.atlas->width <= 0 && state.atlas->height <= 0, state.p_root);
+	if (state.atlas->width <= 0 && state.atlas->height <= 0) {
+		xatlas::Destroy(atlas);
+		return state.p_root;
+	}
 	p_root = _output(state, p_index);
 
 	xatlas::Destroy(atlas);
@@ -760,6 +758,9 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 			for (int32_t index_i = 0; index_i < mesh_indices.size(); index_i++) {
 				Ref<Material> mat = r_meshes[mesh_i].mesh->surface_get_material(j);
 				int32_t material_i = material_cache.find(mat);
+				if (material_i < 0 || material_i >= material_cache.size()) {
+					continue;
+				}
 				if (material_i != -1) {
 					materials.write[index_i] = material_i;
 				}
