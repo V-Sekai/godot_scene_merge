@@ -149,7 +149,7 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 			if (has_blends || has_bones || has_transparency) {
 				break;
 			}
-			if (r_items[r_items.size() - 1].vertex_count > INT_MAX) {
+			if (r_items[r_items.size() - 1].vertex_count > 65536) {
 				MeshMerge new_mesh;
 				r_items.push_back(new_mesh);
 				continue;

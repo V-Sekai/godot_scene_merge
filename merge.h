@@ -205,7 +205,7 @@ private:
 	};
 	struct MeshMerge {
 		Vector<MeshState> meshes;
-		int64_t vertex_count = 0;
+		int vertex_count = 0;
 	};
 	static bool setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float);
 	Ref<Image> dilate(Ref<Image> source_image);
