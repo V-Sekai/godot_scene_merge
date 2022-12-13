@@ -142,7 +142,17 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 			if (has_blends || has_bones || has_transparency) {
 				break;
 			}
-			mesh_state.mesh = array_mesh;
+			if (r_items[r_items.size() - 1].vertex_count > 65536) {
+				MeshMerge new_mesh;
+				r_items.push_back(new_mesh);
+				continue;
+			}
+			Ref<SurfaceTool> st;
+			st.instantiate();
+			st->create_from_triangle_arrays(array);
+			Ref<ArrayMesh> split_mesh = st->commit();
+			split_mesh->surface_set_material(0, array_mesh->surface_get_material(surface_i));
+			mesh_state.mesh = split_mesh;
 			if (mi->is_inside_tree()) {
 				mesh_state.path = mi->get_path();
 			}
