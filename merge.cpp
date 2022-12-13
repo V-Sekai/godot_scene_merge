@@ -123,6 +123,9 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 		bool has_transparency = false;
 		Ref<Mesh> array_mesh = mi->get_mesh();
 		for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
+			array_mesh->surface_set_material(surface_i, mi->get_active_material(surface_i));
+		}
+		for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 			Array array = array_mesh->surface_get_arrays(surface_i);
 			Array bones = array[ArrayMesh::ARRAY_BONES];
 			has_bones |= bones.size() != 0;
@@ -843,12 +846,10 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(Vector<MeshState> me
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
 		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
-			if (mesh_items[mesh_i].mesh_instance->get_active_material(j).is_valid()) {
-				Ref<BaseMaterial3D> mat = mesh_items[mesh_i].mesh_instance->get_active_material(j);
-				Ref<Texture2D> texture = mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
-				if (texture.is_valid()) {
-					largest_dimension = MAX(texture->get_size().x, texture->get_size().y);
-				}
+			Ref<BaseMaterial3D> mat = array_mesh->surface_get_material(j);
+			Ref<Texture2D> texture = mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
+			if (texture.is_valid()) {
+				largest_dimension = MAX(texture->get_size().x, texture->get_size().y);
 			}
 		}
 	}
@@ -860,13 +861,6 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(Vector<MeshState> me
 			Array mesh = array_mesh->surface_get_arrays(j);
 			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
 			Ref<BaseMaterial3D> material = mesh_items[mesh_i].mesh->surface_get_material(j);
-			if (material.is_null()) {
-				material = Ref<StandardMaterial3D>(memnew(StandardMaterial3D));
-				mesh_items.write[mesh_i].mesh->surface_set_material(j, material);
-			}
-			if (mesh_items[mesh_i].mesh_instance->get_active_material(j).is_valid()) {
-				material = mesh_items[mesh_i].mesh_instance->get_active_material(j);
-			}
 			if (material->get_texture(BaseMaterial3D::TEXTURE_ALBEDO).is_null()) {
 				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 				img->fill(material->get_albedo());
