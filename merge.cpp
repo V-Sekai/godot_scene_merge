@@ -123,7 +123,11 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 		bool has_transparency = false;
 		Ref<Mesh> array_mesh = mi->get_mesh();
 		for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
-			array_mesh->surface_set_material(surface_i, mi->get_active_material(surface_i));
+			Ref<Material> active_material = mi->get_active_material(surface_i);
+			if (active_material.is_null()) {
+				active_material = Ref<StandardMaterial3D>(memnew(StandardMaterial3D));
+			}
+			array_mesh->surface_set_material(surface_i, active_material);
 		}
 		for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 			Array array = array_mesh->surface_get_arrays(surface_i).duplicate(true);
@@ -389,9 +393,6 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 			} else if (texture_type == "emission") {
 				img = state.material_image_cache[chart.material].emission_img;
 			}
-			if (img.is_null()) {
-				img = Image::create_empty(default_texture_length, default_texture_length, false, Image::FORMAT_RGBA8);
-			}
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
 			img->convert(Image::FORMAT_RGBA8);
 			SetAtlasTexelArgs args;
@@ -425,9 +426,6 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Ref<BaseMaterial3D> material, String texture_type) {
 	int32_t width = 0;
 	int32_t height = 0;
-	if (material.is_null()) {
-		return Ref<Image>();
-	}
 	Ref<Texture2D> ao_texture = material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION);
 	Ref<Image> ao_img;
 	if (ao_texture.is_valid()) {
@@ -785,14 +783,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 				}
 				ERR_CONTINUE(index == -1);
 				const Ref<Material> material = index_to_material.get(index);
-				if (material.is_null()) {
-					uvs.resize(0);
-					continue;
-				}
 				Ref<BaseMaterial3D> Node3D_material = material;
-				if (Node3D_material.is_null()) {
-					continue;
-				}
 				const Ref<Texture2D> tex = Node3D_material->get_texture(BaseMaterial3D::TextureParam::TEXTURE_ALBEDO);
 				uvs.write[vertex_i] = r_model_vertices[mesh_count][vertex_i].uv;
 				if (tex.is_valid()) {
@@ -892,6 +883,15 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(Vector<MeshState> me
 				Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 				material->set_texture(BaseMaterial3D::TEXTURE_EMISSION, tex);
 			}
+			if (material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION).is_null()) {
+				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+				float ao = 1.0f;
+				Color c = Color(ao, ao, ao);
+				img->fill(c);
+				Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
+				material->set_ao_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
+				material->set_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION, tex);
+			}
 			if (material->get_texture(BaseMaterial3D::TEXTURE_ROUGHNESS).is_null()) {
 				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 				float roughness = material->get_roughness();
@@ -911,15 +911,6 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(Vector<MeshState> me
 				Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 				material->set_metallic_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
 				material->set_texture(BaseMaterial3D::TEXTURE_METALLIC, tex);
-			}
-			if (material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION).is_null()) {
-				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
-				float ao = 1.0f;
-				Color c = Color(ao, ao, ao);
-				img->fill(c);
-				Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
-				material->set_ao_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
-				material->set_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION, tex);
 			}
 			if (!material->get_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING)) {
 				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
@@ -982,7 +973,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		Ref<ArrayMesh> array_mesh = st->commit();
 		st_all->append_from(array_mesh, 0, Transform3D());
 	}
-	Ref<ORMMaterial3D> mat;
+	Ref<StandardMaterial3D> mat;
 	mat.instantiate();
 	mat->set_name("Atlas");
 	HashMap<String, Ref<Image> >::Iterator A = state.texture_atlas.find("albedo");
@@ -1045,7 +1036,14 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 		ResourceSaver::save(tex, path);
 		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
-		mat->set_texture(BaseMaterial3D::TEXTURE_ORM, res);
+		mat->set_ao_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_RED); 
+		mat->set_feature(BaseMaterial3D::FEATURE_AMBIENT_OCCLUSION, true); 
+		mat->set_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION, tex); 
+		mat->set_roughness_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN); 
+		mat->set_texture(BaseMaterial3D::TEXTURE_ROUGHNESS, tex); 
+		mat->set_metallic_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_BLUE); 
+		mat->set_metallic(1.0); 
+		mat->set_texture(BaseMaterial3D::TEXTURE_METALLIC, res); 
 	}
 	mat->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
 	MeshInstance3D *mi = memnew(MeshInstance3D);
