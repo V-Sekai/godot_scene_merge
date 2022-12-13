@@ -195,23 +195,6 @@ void MeshMergeMaterialRepack::_bind_methods() {
 }
 
 Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String p_output_path) {
-
-	bool has_mesh_unwrap = false;
-	List<MethodInfo> methods;
-	Ref<ArrayMesh> empty_mesh;
-	empty_mesh.instantiate();
-	empty_mesh->get_method_list(&methods);
-	for (MethodInfo method : methods) {
-		if (method.name != "lightmap_unwrap") {
-			continue;
-		}
-		has_mesh_unwrap = true;
-	}
-	if (!has_mesh_unwrap) {
-		ERR_PRINT_ED("Can't merge the scene meshes without mesh unwrapping.");
-		return p_original_root;
-	}
-
 	MeshMergeState mesh_merge_state;
 	mesh_merge_state.root = p_root;
 	mesh_merge_state.original_root = p_original_root;
