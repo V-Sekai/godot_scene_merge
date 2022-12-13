@@ -265,80 +265,17 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 		step++;
 #endif
 		Ref<BaseMaterial3D> material = abstract_material;
-		if (material->get_texture(BaseMaterial3D::TEXTURE_ALBEDO).is_null()) {
-			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
-			img->fill(material->get_albedo());
-			material->set_albedo(Color(1.0f, 1.0f, 1.0f));
-			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
-			material->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, tex);
-		}
-		if (material->get_texture(BaseMaterial3D::TEXTURE_EMISSION).is_null()) {
-			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
-			img->fill(material->get_emission());
-
-			Color emission_col = material->get_emission();
-			float emission_energy = material->get_emission_energy_multiplier();
-			Color color_mul;
-			Color color_add;
-			if (material->get_emission_operator() == BaseMaterial3D::EMISSION_OP_ADD) {
-				color_mul = Color(1, 1, 1) * emission_energy;
-				color_add = emission_col * emission_energy;
-			} else {
-				color_mul = emission_col * emission_energy;
-				color_add = Color(0, 0, 0);
-			}
-			material->set_feature(BaseMaterial3D::FEATURE_EMISSION, true);
-			Color c;
-			c.r = c.r * color_mul.r + color_add.r;
-			c.g = c.g * color_mul.g + color_add.g;
-			c.b = c.b * color_mul.b + color_add.b;
-			material->set_emission(c);
-			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
-			material->set_texture(BaseMaterial3D::TEXTURE_EMISSION, tex);
-		}
-		if (material->get_texture(BaseMaterial3D::TEXTURE_ROUGHNESS).is_null()) {
-			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
-			float roughness = material->get_roughness();
-			Color c = Color(roughness, roughness, roughness);
-			material->set_roughness(1.0f);
-			img->fill(c);
-			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
-			material->set_roughness_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
-			material->set_texture(BaseMaterial3D::TEXTURE_ROUGHNESS, tex);
-		}
-		if (material->get_texture(BaseMaterial3D::TEXTURE_METALLIC).is_null()) {
-			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
-			float metallic = material->get_metallic();
-			Color c = Color(metallic, metallic, metallic);
-			material->set_metallic(1.0f);
-			img->fill(c);
-			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
-			material->set_metallic_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
-			material->set_texture(BaseMaterial3D::TEXTURE_METALLIC, tex);
-		}
-		if (material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION).is_null()) {
-			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
-			float ao = 1.0f;
-			Color c = Color(ao, ao, ao);
-			img->fill(c);
-			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
-			material->set_ao_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
-			material->set_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION, tex);
-		}
-		if (!material->get_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING)) {
-			Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
-			Color c = Color(0.5f, 0.5f, 1.0f);
-			img->fill(c);
-			Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
-			material->set_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING, true);
-			material->set_texture(BaseMaterial3D::TEXTURE_NORMAL, tex);
-		}
 		MaterialImageCache cache;
 		cache.albedo_img = _get_source_texture(state, material, "albedo");
 		cache.emission_img = _get_source_texture(state, material, "emission");
 		cache.normal_img = _get_source_texture(state, material, "normal");
 		cache.orm_img = _get_source_texture(state, material, "orm");
-		state.material_image_cache[state.material_cache.find(abstract_material)] = cache;
+		int32_t material_i = state.material_cache.find(abstract_material);
+		if (material_i == -1) {
+			state.material_image_cache[state.material_image_cache.size()] = cache;
+		} else {
+			state.material_image_cache[material_i] = cache;
+		}
 #ifdef TOOLS_ENABLED
 		progress_scene_merge.step(TTR("Getting Source Material: ") + material->get_name() + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
 #endif
@@ -891,7 +828,7 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 	return target_image;
 }
 
-void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshState> mesh_items, Array &mesh_to_index_to_material, Vector<Ref<Material> > &material_cache) {
+void MeshMergeMaterialRepack::map_mesh_to_index_to_material(Vector<MeshState> mesh_items, Array &mesh_to_index_to_material, Vector<Ref<Material> > &material_cache) {
 	float largest_dimension = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
@@ -912,17 +849,90 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshSta
 		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
 			Array mesh = array_mesh->surface_get_arrays(j);
 			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
-			Ref<Material> mat = mesh_items[mesh_i].mesh->surface_get_material(j);
-			if (mesh_items[mesh_i].mesh_instance->get_active_material(j).is_valid()) {
-				mat = mesh_items[mesh_i].mesh_instance->get_active_material(j);
+			Ref<BaseMaterial3D> material = mesh_items[mesh_i].mesh->surface_get_material(j);
+			if (material.is_null()) {
+				material = Ref<StandardMaterial3D>(memnew(StandardMaterial3D));
+				mesh_items.write[mesh_i].mesh->surface_set_material(j, material);
 			}
-			if (material_cache.find(mat) == -1) {
-				material_cache.push_back(mat);
+			if (mesh_items[mesh_i].mesh_instance->get_active_material(j).is_valid()) {
+				material = mesh_items[mesh_i].mesh_instance->get_active_material(j);
+			}
+			if (material->get_texture(BaseMaterial3D::TEXTURE_ALBEDO).is_null()) {
+				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+				img->fill(material->get_albedo());
+				material->set_albedo(Color(1.0f, 1.0f, 1.0f));
+				Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
+				material->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, tex);
+			}
+			if (material->get_texture(BaseMaterial3D::TEXTURE_EMISSION).is_null()) {
+				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+				img->fill(material->get_emission());
+
+				Color emission_col = material->get_emission();
+				float emission_energy = material->get_emission_energy_multiplier();
+				Color color_mul;
+				Color color_add;
+				if (material->get_emission_operator() == BaseMaterial3D::EMISSION_OP_ADD) {
+					color_mul = Color(1, 1, 1) * emission_energy;
+					color_add = emission_col * emission_energy;
+				} else {
+					color_mul = emission_col * emission_energy;
+					color_add = Color(0, 0, 0);
+				}
+				material->set_feature(BaseMaterial3D::FEATURE_EMISSION, true);
+				Color c;
+				c.r = c.r * color_mul.r + color_add.r;
+				c.g = c.g * color_mul.g + color_add.g;
+				c.b = c.b * color_mul.b + color_add.b;
+				material->set_emission(c);
+				Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
+				material->set_texture(BaseMaterial3D::TEXTURE_EMISSION, tex);
+			}
+			if (material->get_texture(BaseMaterial3D::TEXTURE_ROUGHNESS).is_null()) {
+				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+				float roughness = material->get_roughness();
+				Color c = Color(roughness, roughness, roughness);
+				material->set_roughness(1.0f);
+				img->fill(c);
+				Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
+				material->set_roughness_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
+				material->set_texture(BaseMaterial3D::TEXTURE_ROUGHNESS, tex);
+			}
+			if (material->get_texture(BaseMaterial3D::TEXTURE_METALLIC).is_null()) {
+				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+				float metallic = material->get_metallic();
+				Color c = Color(metallic, metallic, metallic);
+				material->set_metallic(1.0f);
+				img->fill(c);
+				Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
+				material->set_metallic_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
+				material->set_texture(BaseMaterial3D::TEXTURE_METALLIC, tex);
+			}
+			if (material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION).is_null()) {
+				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+				float ao = 1.0f;
+				Color c = Color(ao, ao, ao);
+				img->fill(c);
+				Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
+				material->set_ao_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
+				material->set_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION, tex);
+			}
+			if (!material->get_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING)) {
+				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
+				Color c = Color(0.5f, 0.5f, 1.0f);
+				img->fill(c);
+				Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
+				material->set_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING, true);
+				material->set_texture(BaseMaterial3D::TEXTURE_NORMAL, tex);
+			}
+
+			if (material_cache.find(material) == -1) {
+				material_cache.push_back(material);
 			}
 			Array materials;
 			materials.resize(indices.size());
 			for (int32_t index_i = 0; index_i < indices.size(); index_i++) {
-				materials[index_i] = mat;
+				materials[index_i] = material;
 			}
 			mesh_to_index_to_material.push_back(materials);
 		}
