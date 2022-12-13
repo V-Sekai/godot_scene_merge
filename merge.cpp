@@ -1041,16 +1041,9 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 		ResourceSaver::save(tex, path);
 		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
-		mat->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
-		mat->set_ao_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_RED);
-		mat->set_feature(BaseMaterial3D::FEATURE_AMBIENT_OCCLUSION, true);
-		mat->set_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION, tex);
-		mat->set_roughness_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_GREEN);
-		mat->set_texture(BaseMaterial3D::TEXTURE_ROUGHNESS, tex);
-		mat->set_metallic_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_BLUE);
-		mat->set_metallic(1.0);
-		mat->set_texture(BaseMaterial3D::TEXTURE_METALLIC, res);
+		mat->set_texture(BaseMaterial3D::TEXTURE_ORM, res);
 	}
+	mat->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
 	MeshInstance3D *mi = memnew(MeshInstance3D);
 	Ref<ArrayMesh> array_mesh = st_all->commit();
 	mi->set_mesh(array_mesh);
