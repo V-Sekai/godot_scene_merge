@@ -426,8 +426,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 }
 
 Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Ref<BaseMaterial3D> material, String texture_type) {
-	int32_t width = 0;
-	int32_t height = 0;
+	int32_t width = default_texture_length;
+	int32_t height = default_texture_length;
 	Ref<Texture2D> ao_texture = material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION);
 	Ref<Image> ao_img;
 	if (ao_texture.is_valid()) {
