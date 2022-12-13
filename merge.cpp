@@ -206,6 +206,22 @@ void MeshMergeMaterialRepack::_bind_methods() {
 
 Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String p_output_path) {
 
+	bool has_mesh_unwrap = false;
+	List<MethodInfo> methods;
+	Ref<ArrayMesh> empty_mesh;
+	empty_mesh.instantiate();
+	empty_mesh->get_method_list(&methods);
+	for (MethodInfo method : methods) {
+		if (method.name != "lightmap_unwrap") {
+			continue;
+		}
+		has_mesh_unwrap = true;
+	}
+	if (!has_mesh_unwrap) {
+		ERR_PRINT_ED("Can't merge the scene meshes without mesh unwrapping.");
+		return p_original_root;
+	}
+
 	MeshMergeState mesh_merge_state;
 	mesh_merge_state.root = p_root;
 	mesh_merge_state.original_root = p_original_root;
@@ -902,32 +918,39 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 }
 
 void MeshMergeMaterialRepack::map_mesh_to_index_to_material(const Vector<MeshState> mesh_items, Array &mesh_to_index_to_material, Vector<Ref<Material> > &material_cache) {
+	float largest_dimension = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
-		List<MethodInfo> methods;
-		array_mesh->get_method_list(&methods);
-		for (MethodInfo method : methods) {
-			if (method.name != "lightmap_unwrap") {
-				continue;
+		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
+			if (mesh_items[mesh_i].mesh_instance->get_active_material(j).is_valid()) {
+				Ref<BaseMaterial3D> mat = mesh_items[mesh_i].mesh_instance->get_active_material(j);
+				Ref<Texture2D> texture = mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
+				if (texture.is_valid()) {
+					largest_dimension = MAX(texture->get_size().x, texture->get_size().y);
+				}
 			}
-			array_mesh->call("lightmap_unwrap", 2.0f, true);
-			for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
-				Array mesh = array_mesh->surface_get_arrays(j);
-				Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
-				Ref<Material> mat = mesh_items[mesh_i].mesh->surface_get_material(j);
-				if (mesh_items[mesh_i].mesh_instance->get_active_material(j).is_valid()) {
-					mat = mesh_items[mesh_i].mesh_instance->get_active_material(j);
-				}
-				if (material_cache.find(mat) == -1) {
-					material_cache.push_back(mat);
-				}
-				Array materials;
-				materials.resize(indices.size());
-				for (int32_t index_i = 0; index_i < indices.size(); index_i++) {
-					materials[index_i] = mat;
-				}
-				mesh_to_index_to_material.push_back(materials);
+		}
+	}
+	largest_dimension = MAX(largest_dimension, default_texture_length);
+	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
+		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
+		array_mesh->call("lightmap_unwrap", Transform3D(), 1.0f / largest_dimension, true);
+		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
+			Array mesh = array_mesh->surface_get_arrays(j);
+			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
+			Ref<Material> mat = mesh_items[mesh_i].mesh->surface_get_material(j);
+			if (mesh_items[mesh_i].mesh_instance->get_active_material(j).is_valid()) {
+				mat = mesh_items[mesh_i].mesh_instance->get_active_material(j);
 			}
+			if (material_cache.find(mat) == -1) {
+				material_cache.push_back(mat);
+			}
+			Array materials;
+			materials.resize(indices.size());
+			for (int32_t index_i = 0; index_i < indices.size(); index_i++) {
+				materials[index_i] = mat;
+			}
+			mesh_to_index_to_material.push_back(materials);
 		}
 	}
 }
