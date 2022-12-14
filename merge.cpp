@@ -149,7 +149,8 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 			if (has_blends || has_bones || has_transparency) {
 				break;
 			}
-			if (r_items[r_items.size() - 1].vertex_count > 65536) {
+			int32_t vertices_that_fit_4096_x_4096 = 65536.0;
+			if (r_items[r_items.size() - 1].vertex_count > vertices_that_fit_4096_x_4096) {
 				MeshMerge new_mesh;
 				r_items.push_back(new_mesh);
 				continue;
@@ -426,8 +427,8 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 }
 
 Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Ref<BaseMaterial3D> material, String texture_type) {
-	int32_t width = default_texture_length;
-	int32_t height = default_texture_length;
+	int32_t width = 0;
+	int32_t height = 0;
 	Ref<Texture2D> ao_texture = material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION);
 	Ref<Image> ao_img;
 	if (ao_texture.is_valid()) {
