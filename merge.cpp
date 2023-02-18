@@ -249,6 +249,7 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 	_generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, material_cache, pack_options);
 	atlas_lookup.resize(atlas->width * atlas->height);
 	HashMap<String, Ref<Image> > texture_atlas;
+	HashMap<int32_t, MaterialImageCache> material_image_cache;
 
 	MergeState state = {
 		p_root, atlas,
@@ -261,8 +262,11 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 		pack_options,
 		atlas_lookup,
 		material_cache,
-		texture_atlas
+		texture_atlas,
+		material_image_cache,
 	};
+
+
 #ifdef TOOLS_ENABLED
 	EditorProgress progress_scene_merge("gen_get_source_material", TTR("Get source material"), state.material_cache.size());
 	int step = 0;
