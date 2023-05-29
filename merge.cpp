@@ -843,7 +843,7 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(Vector<MeshState> me
 	largest_dimension = MAX(largest_dimension, default_texture_length);
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
-		array_mesh->call("lightmap_unwrap", Transform3D(), 1.0f / largest_dimension, true);
+		array_mesh->lightmap_unwrap(Transform3D(), 1.0f / largest_dimension, true);
 		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
 			Array mesh = array_mesh->surface_get_arrays(j);
 			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
