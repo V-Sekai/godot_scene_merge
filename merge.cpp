@@ -792,6 +792,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension(const Vector<MeshSt
 		}
 	}
 }
+
 Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 	Ref<Image> target_image = source_image->duplicate();
 	target_image->convert(Image::FORMAT_RGBA8);
@@ -1079,6 +1080,7 @@ void SceneMergePlugin::merge() {
 	}
 	file_export_lib->set_current_file(filename + String(".scn"));
 }
+
 void SceneMergePlugin::_dialog_action(String p_file) {
 	Node *node = EditorNode::get_singleton()->get_tree()->get_edited_scene_root();
 	if (!node) {
@@ -1285,42 +1287,46 @@ bool MeshMergeMaterialRepack::Triangle::drawAA(SamplingCallback cb, void *param)
 	const float BK_SIZE = 8;
 	const float BK_INSIDE = sqrtf(BK_SIZE * BK_SIZE / 2.0f);
 	const float BK_OUTSIDE = -sqrtf(BK_SIZE * BK_SIZE / 2.0f);
-	float minx, miny, maxx, maxy;
+
 	// Bounding rectangle
-	minx = floorf(MAX(MIN(v1.x, MIN(v2.x, v3.x)), 0.0f));
-	miny = floorf(MAX(MIN(v1.y, MIN(v2.y, v3.y)), 0.0f));
-	maxx = ceilf(MAX(v1.x, MAX(v2.x, v3.x)));
-	maxy = ceilf(MAX(v1.y, MAX(v2.y, v3.y)));
-	// There's no reason to align the blocks to the viewport, instead we align them to the origin of the triangle bounds.
-	minx = floorf(minx);
-	miny = floorf(miny);
-	// minx = (float)(((int)minx) & (~((int)BK_SIZE - 1))); // align to blocksize (we don't need to worry about blocks partially out of viewport)
-	// miny = (float)(((int)miny) & (~((int)BK_SIZE - 1)));
-	minx += 0.5;
-	miny += 0.5; // sampling at texel centers!
-	maxx += 0.5;
-	maxy += 0.5;
+	float minx = floorf(MAX(MIN(v1.x, MIN(v2.x, v3.x)), 0.0f));
+	float miny = floorf(MAX(MIN(v1.y, MIN(v2.y, v3.y)), 0.0f));
+	float maxx = ceilf(MAX(v1.x, MAX(v2.x, v3.x)));
+	float maxy = ceilf(MAX(v1.y, MAX(v2.y, v3.y)));
+
+	// Align to texel centers
+	minx += 0.5f;
+	miny += 0.5f;
+	maxx += 0.5f;
+	maxy += 0.5f;
+
 	// Half-edge constants
 	float C1 = n1.x * (-v1.x) + n1.y * (-v1.y);
 	float C2 = n2.x * (-v2.x) + n2.y * (-v2.y);
 	float C3 = n3.x * (-v3.x) + n3.y * (-v3.y);
+
 	// Loop through blocks
 	for (float y0 = miny; y0 <= maxy; y0 += BK_SIZE) {
 		for (float x0 = minx; x0 <= maxx; x0 += BK_SIZE) {
 			// Corners of block
 			float xc = (x0 + (BK_SIZE - 1) / 2.0f);
 			float yc = (y0 + (BK_SIZE - 1) / 2.0f);
+
 			// Evaluate half-space functions
 			float aC = C1 + n1.x * xc + n1.y * yc;
 			float bC = C2 + n2.x * xc + n2.y * yc;
 			float cC = C3 + n3.x * xc + n3.y * yc;
+
 			// Skip block when outside an edge
 			if ((aC <= BK_OUTSIDE) || (bC <= BK_OUTSIDE) || (cC <= BK_OUTSIDE)) {
 				continue;
 			}
+
+			// Calculate initial texture coordinates
+			Vector3 texRow = t1 + dy * (y0 - v1.y) + dx * (x0 - v1.x);
+
 			// Accept whole block when totally covered
 			if ((aC >= BK_INSIDE) && (bC >= BK_INSIDE) && (cC >= BK_INSIDE)) {
-				Vector3 texRow = t1 + dy * (y0 - v1.y) + dx * (x0 - v1.x);
 				for (float y = y0; y < y0 + BK_SIZE; y++) {
 					Vector3 tex = texRow;
 					for (float x = x0; x < x0 + BK_SIZE; x++) {
@@ -1335,13 +1341,14 @@ bool MeshMergeMaterialRepack::Triangle::drawAA(SamplingCallback cb, void *param)
 				float CY1 = C1 + n1.x * x0 + n1.y * y0;
 				float CY2 = C2 + n2.x * x0 + n2.y * y0;
 				float CY3 = C3 + n3.x * x0 + n3.y * y0;
-				Vector3 texRow = t1 + dy * (y0 - v1.y) + dx * (x0 - v1.x);
-				for (float y = y0; y < y0 + BK_SIZE; y++) { // @@ This is not clipping to scissor rectangle correctly.
+
+				for (float y = y0; y < y0 + BK_SIZE; y++) {
 					float CX1 = CY1;
 					float CX2 = CY2;
 					float CX3 = CY3;
 					Vector3 tex = texRow;
-					for (float x = x0; x < x0 + BK_SIZE; x++) { // @@ This is not clipping to scissor rectangle correctly.
+
+					for (float x = x0; x < x0 + BK_SIZE; x++) {
 						Vector3 tex2 = t1 + dx * (x - v1.x) + dy * (y - v1.y);
 						if (CX1 >= PX_INSIDE && CX2 >= PX_INSIDE && CX3 >= PX_INSIDE) {
 							// pixel completely covered
