@@ -943,6 +943,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	if (state.atlas->width == 0 || state.atlas->height == 0) {
 		return state.p_root;
 	}
+	print_line(vformat("Atlas size: (%d, %d)", state.atlas->width, state.atlas->height));
 	MeshMergeMaterialRepack::TextureData texture_data;
 	for (int32_t mesh_i = 0; mesh_i < state.r_mesh_items.size(); mesh_i++) {
 		if (state.r_mesh_items[mesh_i].mesh_instance->get_parent()) {
@@ -961,6 +962,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 		st.instantiate();
 		st->begin(Mesh::PRIMITIVE_TRIANGLES);
 		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
+		print_line(vformat("Mesh %d: vertexCount=%d, indexCount=%d", mesh_i, mesh.vertexCount, mesh.indexCount));
 		for (uint32_t v = 0; v < mesh.vertexCount; v++) {
 			const xatlas::Vertex vertex = mesh.vertexArray[v];
 			const ModelVertex &sourceVertex = state.model_vertices[mesh_i][vertex.xref];
@@ -988,6 +990,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	}
 	if (A && !A->key.is_empty()) {
 		Ref<Image> img = dilate(A->value);
+		print_line(vformat("Albedo image size: (%d, %d)", img->get_width(), img->get_height()));
 		img->compress(compress_mode, Image::COMPRESS_SOURCE_SRGB);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
@@ -1002,6 +1005,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	HashMap<String, Ref<Image> >::Iterator E = state.texture_atlas.find("emission");
 	if (E && !E->key.is_empty()) {
 		Ref<Image> img = dilate(E->value);
+		print_line(vformat("Emission image size: (%d, %d)", img->get_width(), img->get_height()));
 		img->compress(compress_mode);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
@@ -1017,6 +1021,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	HashMap<String, Ref<Image> >::Iterator N = state.texture_atlas.find("normal");
 	if (N && !N->key.is_empty()) {
 		Ref<Image> img = dilate(N->value);
+		print_line(vformat("Normal image size: (%d, %d)", img->get_width(), img->get_height()));
 		img->compress(compress_mode, Image::COMPRESS_SOURCE_NORMAL);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
@@ -1032,6 +1037,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	HashMap<String, Ref<Image> >::Iterator ORM = state.texture_atlas.find("orm");
 	if (ORM && !ORM->key.is_empty()) {
 		Ref<Image> img = dilate(ORM->value);
+		print_line(vformat("ORM image size: (%d, %d)", img->get_width(), img->get_height()));
 		img->compress(compress_mode);
 		String path = state.output_path;
 		String base_dir = path.get_base_dir();
