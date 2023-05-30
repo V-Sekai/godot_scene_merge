@@ -78,31 +78,37 @@ void SceneMerge::merge(const String p_file, Node *p_root_node) {
 	ResourceSaver::save(scene, p_file);
 }
 
-bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &dx, const Vector3 &dy, float coverage) {
-	SetAtlasTexelArgs *args = (SetAtlasTexelArgs *)param;
-	if (args->sourceTexture.is_valid()) {
-		// Interpolate source UVs using barycentrics.
-		const Vector2 sourceUv = args->source_uvs[0] * bar.x + args->source_uvs[1] * bar.y + args->source_uvs[2] * bar.z;
+bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float) {
+    SetAtlasTexelArgs *args = static_cast<SetAtlasTexelArgs *>(param);
+    if (args->sourceTexture.is_valid()) {
+        // Interpolate source UVs using barycentrics.
+        const Vector2 sourceUv = args->source_uvs[0] * bar.x + args->source_uvs[1] * bar.y + args->source_uvs[2] * bar.z;
+        
+        // Keep coordinates in range of texture dimensions.
+        int _width = args->sourceTexture->get_width() - 1;
+        int _height = args->sourceTexture->get_height() - 1;
 
-		// Wrap coordinates in range of texture dimensions.
-		int _width = args->sourceTexture->get_width();
-		int _height = args->sourceTexture->get_height();
-		int sx = static_cast<int>(sourceUv.x * _width) % _width;
-		int sy = static_cast<int>(sourceUv.y * _height) % _height;
+        int sx = static_cast<int>(sourceUv.x * _width) % _width;
+        int sy = static_cast<int>(sourceUv.y * _height) % _height;
 
-		// Wrap atlas coordinates in range of atlas dimensions.
-		x = (x + args->atlas_width) % args->atlas_width;
-		y = (y + args->atlas_height) % args->atlas_height;
+        if (sx < 0) {
+            sx += _width;
+        }
+        if (sy < 0) {
+            sy += _height;
+        }
 
-		const Color color = args->sourceTexture->get_pixel(sx, sy);
-		args->atlasData->set_pixel(x, y, color);
-		AtlasLookupTexel &lookup = args->atlas_lookup[x + y * args->atlas_width];
-		lookup.material_index = args->material_index;
-		lookup.x = (uint16_t)sx;
-		lookup.y = (uint16_t)sy;
-		return true;
-	}
-	return false;
+        const Color color = args->sourceTexture->get_pixel(sx, sy);
+        args->atlasData->set_pixel(x, y, color);
+
+        AtlasLookupTexel &lookup = args->atlas_lookup[x * y + args->atlas_width];
+        lookup.material_index = args->material_index;
+        lookup.x = static_cast<uint16_t>(sx);
+        lookup.y = static_cast<uint16_t>(sy);
+
+        return true;
+    }
+    return false;
 }
 
 void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner) {
