@@ -49,10 +49,6 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 
 #include "core/object/ref_counted.h"
 
-#ifdef TOOLS_ENABLED
-#include "editor/editor_node.h"
-#include "editor/editor_plugin.h"
-#endif
 
 #include "modules/csg/csg_shape.h"
 #include "modules/gridmap/grid_map.h"
@@ -69,31 +65,6 @@ private:
 public:
 	void merge(const String p_file, Node *p_root_node);
 };
-
-#ifdef TOOLS_ENABLED
-#include "editor/editor_file_dialog.h"
-class SceneMergePlugin : public EditorPlugin {
-
-	GDCLASS(SceneMergePlugin, EditorPlugin);
-	CheckBox *file_export_lib_merge = memnew(CheckBox);
-	EditorFileDialog *file_export_lib = memnew(EditorFileDialog);
-	Ref<SceneMerge> scene_optimize;
-	void _dialog_action(String p_file);
-	void merge();
-
-protected:
-	static void _bind_methods();
-
-public:
-	SceneMergePlugin();
-	~SceneMergePlugin() {
-		EditorNode::get_singleton()->remove_tool_menu_item("Merge Scene");
-	}
-	void _notification(int notification);
-};
-#endif
-
-#endif
 
 #include "core/math/vector2.h"
 #include "core/object/ref_counted.h"
@@ -205,13 +176,12 @@ private:
 	};
 	static bool setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &dx, const Vector3 &dy, float coverage);
 	Ref<Image> dilate(Ref<Image> source_image);
-	void _find_all_animated_meshes(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
 	void _find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
 	void _generate_texture_atlas(MergeState &state, String texture_type);
-	Ref<Image> _get_source_texture(MergeState &state, Ref<BaseMaterial3D> material, String texture_type);
+	Ref<Image> _get_source_texture(MergeState &state, Ref<BaseMaterial3D> material);
 	void _generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
 			xatlas::PackOptions &pack_options);
-	void scale_uvs_by_texture_dimension(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices);
+	void scale_uvs_by_texture_dimension_larger(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices);
 	void map_mesh_to_index_to_material(Vector<MeshState> mesh_items, Array &vertex_to_material, Vector<Ref<Material> > &material_cache);
 	Node *_output(MergeState &state, int p_count);
 	struct MeshMergeState {
@@ -222,10 +192,6 @@ private:
 		String output_path;
 	};
 	Node *_merge_list(MeshMergeState p_mesh_merge_state, int p_index);
-	void _mark_nodes(Node *p_current, Node *p_owner, Vector<Node *> &r_nodes);
-	void _remove_empty_Node3Ds(Node *scene);
-	void _clean_animation_player(Node *scene);
-	void _remove_nodes(Node *scene, Vector<Node *> &r_nodes);
 
 protected:
 	static void _bind_methods();
@@ -233,3 +199,5 @@ protected:
 public:
 	Node *merge(Node *p_root, Node *p_original_root, String p_output_path);
 };
+
+#endif 
