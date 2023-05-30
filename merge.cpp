@@ -805,10 +805,10 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 			int32_t pixel_index = x + (width * y);
 			int32_t index = pixel_index * bytes_in_pixel;
 			Color pixel = target_image->get_pixel(x, y);
-			pixels.write[index + 0] = uint8_t(pixel.r * 255.0);
-			pixels.write[index + 1] = uint8_t(pixel.g * 255.0);
-			pixels.write[index + 2] = uint8_t(pixel.b * 255.0);
-			pixels.write[index + 3] = uint8_t(pixel.a * 255.0);
+			pixels.write[index + 0] = uint8_t(pixel.r * 255.0f);
+			pixels.write[index + 1] = uint8_t(pixel.g * 255.0f);
+			pixels.write[index + 2] = uint8_t(pixel.b * 255.0f);
+			pixels.write[index + 3] = uint8_t(pixel.a * 255.0f);
 		}
 	}
 	rjm_texbleed(pixels.ptrw(), width, height, 3, bytes_in_pixel, bytes_in_pixel * width);
@@ -817,9 +817,9 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 			Color pixel;
 			int32_t pixel_index = x + (width * y);
 			int32_t index = bytes_in_pixel * pixel_index;
-			pixel.r = pixels[index + 0] / 255.0;
-			pixel.g = pixels[index + 1] / 255.0;
-			pixel.b = pixels[index + 2] / 255.0;
+			pixel.r = pixels[index + 0] / 255.0f;
+			pixel.g = pixels[index + 1] / 255.0f;
+			pixel.b = pixels[index + 2] / 255.0f;
 			pixel.a = 1.0f;
 			target_image->set_pixel(x, y, pixel);
 		}
