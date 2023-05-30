@@ -252,7 +252,8 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 	HashMap<int32_t, MaterialImageCache> material_image_cache;
 
 	MergeState state = {
-		p_root, atlas,
+		p_root,
+		atlas,
 		mesh_items,
 		mesh_to_index_to_material,
 		uv_groups,
@@ -265,7 +266,6 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 		texture_atlas,
 		material_image_cache,
 	};
-
 
 #ifdef TOOLS_ENABLED
 	EditorProgress progress_scene_merge("gen_get_source_material", TTR("Get source material"), state.material_cache.size());
@@ -1146,7 +1146,9 @@ void MeshMergeMaterialRepack::ClippedTriangle::clipHorizontalPlane(float offset,
 	for (uint32_t k = 0; k < m_numVertices; k++) {
 		dy2 = offset - v[k + 1].y;
 		dy2in = clipdirection * dy2 >= 0;
-		if (dy1in) v2[p++] = v[k];
+		if (dy1in) {
+			v2[p++] = v[k];
+		}
 		if (dy1in + dy2in == 1) { // not both in/out
 			float dx = v[k + 1].x - v[k].x;
 			float dy = v[k + 1].y - v[k].y;
@@ -1169,7 +1171,9 @@ void MeshMergeMaterialRepack::ClippedTriangle::clipVerticalPlane(float offset, f
 	for (uint32_t k = 0; k < m_numVertices; k++) {
 		dx2 = offset - v[k + 1].x;
 		dx2in = clipdirection * dx2 >= 0;
-		if (dx1in) v2[p++] = v[k];
+		if (dx1in) {
+			v2[p++] = v[k];
+		}
 		if (dx1in + dx2in == 1) { // not both in/out
 			float dx = v[k + 1].x - v[k].x;
 			float dy = v[k + 1].y - v[k].y;
@@ -1311,7 +1315,9 @@ bool MeshMergeMaterialRepack::Triangle::drawAA(SamplingCallback cb, void *param)
 			float bC = C2 + n2.x * xc + n2.y * yc;
 			float cC = C3 + n3.x * xc + n3.y * yc;
 			// Skip block when outside an edge
-			if ((aC <= BK_OUTSIDE) || (bC <= BK_OUTSIDE) || (cC <= BK_OUTSIDE)) continue;
+			if ((aC <= BK_OUTSIDE) || (bC <= BK_OUTSIDE) || (cC <= BK_OUTSIDE)) {
+				continue;
+			}
 			// Accept whole block when totally covered
 			if ((aC >= BK_INSIDE) && (bC >= BK_INSIDE) && (cC >= BK_INSIDE)) {
 				Vector3 texRow = t1 + dy * (y0 - v1.y) + dx * (x0 - v1.x);
