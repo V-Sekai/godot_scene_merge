@@ -115,20 +115,15 @@ private:
 
 	struct Triangle {
 		Triangle(const Vector2 &v0, const Vector2 &v1, const Vector2 &v2, const Vector3 &t0, const Vector3 &t1, const Vector3 &t2);
-
 		/// Compute texture space deltas.
 		/// This method takes two edge vectors that form a basis, determines the
 		/// coordinates of the canonic vectors in that basis, and computes the
 		/// texture gradient that corresponds to those vectors.
 		bool computeDeltas();
-
 		void flipBackface();
-
 		// compute unit inward normals for each edge.
 		void computeUnitInwardNormals();
-
 		bool drawAA(SamplingCallback cb, void *param);
-
 		Vector2 v1, v2, v3;
 		Vector2 n1, n2, n3; // unit inward normals
 		Vector3 t1, t2, t3;
@@ -167,6 +162,7 @@ private:
 		uint16_t material_index = 0;
 		Vector2 source_uvs[3];
 		uint32_t atlas_width = 0;
+		uint32_t atlas_height = 0;
 	};
 
 	const int32_t default_texture_length = 128;
@@ -207,7 +203,7 @@ private:
 		Vector<MeshState> meshes;
 		int vertex_count = 0;
 	};
-	static bool setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float);
+	static bool setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &dx, const Vector3 &dy, float coverage);
 	Ref<Image> dilate(Ref<Image> source_image);
 	void _find_all_animated_meshes(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
 	void _find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);

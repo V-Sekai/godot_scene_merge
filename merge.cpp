@@ -78,31 +78,25 @@ void SceneMerge::merge(const String p_file, Node *p_root_node) {
 	ResourceSaver::save(scene, p_file);
 }
 
-bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float) {
+bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &dx, const Vector3 &dy, float coverage) {
 	SetAtlasTexelArgs *args = (SetAtlasTexelArgs *)param;
 	if (args->sourceTexture.is_valid()) {
 		// Interpolate source UVs using barycentrics.
 		const Vector2 sourceUv = args->source_uvs[0] * bar.x + args->source_uvs[1] * bar.y + args->source_uvs[2] * bar.z;
-		// Keep coordinates in range of texture dimensions.
-		int _width = args->sourceTexture->get_width() - 1;
-		float sx = sourceUv.x * _width;
-		while (sx < 0) {
-			sx += _width;
-		}
-		if ((int32_t)sx > _width) {
-			sx = Math::fmod(sx, _width);
-		}
-		int _height = args->sourceTexture->get_height() - 1;
-		float sy = sourceUv.y * _height;
-		while (sy < 0) {
-			sy += _height;
-		}
-		if ((int32_t)sy > _height) {
-			sy = Math::fmod(sy, _height);
-		}
+
+		// Wrap coordinates in range of texture dimensions.
+		int _width = args->sourceTexture->get_width();
+		int _height = args->sourceTexture->get_height();
+		int sx = static_cast<int>(sourceUv.x * _width) % _width;
+		int sy = static_cast<int>(sourceUv.y * _height) % _height;
+
+		// Wrap atlas coordinates in range of atlas dimensions.
+		x = (x + args->atlas_width) % args->atlas_width;
+		y = (y + args->atlas_height) % args->atlas_height;
+
 		const Color color = args->sourceTexture->get_pixel(sx, sy);
 		args->atlasData->set_pixel(x, y, color);
-		AtlasLookupTexel &lookup = args->atlas_lookup[x * y + args->atlas_width];
+		AtlasLookupTexel &lookup = args->atlas_lookup[x + y * args->atlas_width];
 		lookup.material_index = args->material_index;
 		lookup.x = (uint16_t)sx;
 		lookup.y = (uint16_t)sy;
@@ -114,9 +108,9 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner) {
 	MeshInstance3D *mi = cast_to<MeshInstance3D>(p_current_node);
 	bool is_valid = false;
-	if (mi) {
-		is_valid = true;
-	}
+    if (mi && mi->is_visible()) {
+        is_valid = true;
+    }
 	if (is_valid && mi->get_mesh().is_valid()) {
 		bool has_blends = false;
 		bool has_bones = false;
@@ -368,6 +362,8 @@ void MeshMergeMaterialRepack::_remove_nodes(Node *scene, Vector<Node *> &r_nodes
 
 void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String texture_type) {
 	Ref<Image> atlas_img = Image::create_empty(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
+	ERR_FAIL_COND_MSG(atlas_img.is_null(), "Failed to create empty atlas image.");
+
 	// Rasterize chart triangles.
 #ifdef TOOLS_ENABLED
 	EditorProgress progress_texture_atlas("gen_mesh_atlas", TTR("Generate Atlas"), state.atlas->meshCount);
@@ -386,13 +382,21 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 				img = state.material_image_cache[chart.material].orm_img;
 			} else if (texture_type == "emission") {
 				img = state.material_image_cache[chart.material].emission_img;
+			} else {
+				ERR_PRINT("Unknown texture type: " + texture_type);
+				continue;
 			}
-			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet");
+			ERR_CONTINUE(img.is_null());
+			ERR_CONTINUE(img->is_empty());
+			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet for texture type: " + texture_type);
+
 			img->convert(Image::FORMAT_RGBA8);
 			SetAtlasTexelArgs args;
 			args.sourceTexture = img;
 			args.atlasData = atlas_img;
 			args.atlas_lookup = state.atlas_lookup.ptrw();
+			args.atlas_height = state.atlas->height;
+			args.atlas_width = state.atlas->width;
 			args.material_index = (uint16_t)chart.material;
 			for (uint32_t face_i = 0; face_i < chart.faceCount; face_i++) {
 				Vector2 v[3];
@@ -400,8 +404,12 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 					const uint32_t index = mesh.indexArray[chart.faceArray[face_i] * 3 + l];
 					const xatlas::Vertex &vertex = mesh.vertexArray[index];
 					v[l] = Vector2(vertex.uv[0], vertex.uv[1]);
-					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / img->get_width();
-					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / img->get_height();
+					int img_width = img->get_width();
+					int img_height = img->get_height();
+					ERR_CONTINUE_MSG(img_width == 0 || img_height == 0, "Image width or height is zero for texture type: " + texture_type);
+
+					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / img_width;
+					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / img_height;
 				}
 				Triangle tri(v[0], v[1], v[2], Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1));
 
