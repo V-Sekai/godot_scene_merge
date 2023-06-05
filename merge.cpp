@@ -232,6 +232,9 @@ Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, in
 		Ref<BaseMaterial3D> material = abstract_material;
 		MaterialImageCache cache{
 			_get_source_texture(state, material),
+			Ref<Image>(),
+			Ref<Image>(),
+			Ref<Image>(),
 		};
 		int32_t material_i = state.material_cache.find(abstract_material);
 		state.material_image_cache[material_i == -1 ? state.material_image_cache.size() : material_i] = cache;
