@@ -49,12 +49,12 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 
 #include "core/object/ref_counted.h"
 
-
-#include "modules/csg/csg_shape.h"
-#include "modules/gridmap/grid_map.h"
+#include "core/math/vector2.h"
+#include "core/object/ref_counted.h"
 #include "scene/3d/mesh_instance_3d.h"
-#include "scene/gui/check_box.h"
 #include "scene/main/node.h"
+
+#include "thirdparty/xatlas/xatlas.h"
 
 class SceneMerge : public RefCounted {
 private:
@@ -65,12 +65,6 @@ private:
 public:
 	void merge(const String p_file, Node *p_root_node);
 };
-
-#include "core/math/vector2.h"
-#include "core/object/ref_counted.h"
-#include "scene/3d/mesh_instance_3d.h"
-
-#include "thirdparty/xatlas/xatlas.h"
 
 class MeshMergeMaterialRepack : public RefCounted {
 private:
@@ -151,9 +145,6 @@ private:
 	};
 	struct MaterialImageCache {
 		Ref<Image> albedo_img;
-		Ref<Image> normal_img;
-		Ref<Image> orm_img;
-		Ref<Image> emission_img;
 	};
 	struct MergeState {
 		Node *p_root;
@@ -200,4 +191,4 @@ public:
 	Node *merge(Node *p_root, Node *p_original_root, String p_output_path);
 };
 
-#endif 
+#endif

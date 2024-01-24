@@ -6,6 +6,7 @@
 #include "editor/editor_node.h"
 #include "editor/editor_plugin.h"
 #include "editor/gui/editor_file_dialog.h"
+#include "scene/gui/check_box.h"
 
 #include "scene/resources/packed_scene.h"
 
