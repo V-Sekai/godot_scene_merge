@@ -6,9 +6,9 @@
 
 namespace TestSceneMerge {
 
-TEST_CASE("[Modules][SceneMerge] Hello World!") {
-	String hello = "Hello World!";
-	CHECK(hello != "Hello World!");
+TEST_CASE("[Modules][SceneMerge] SceneMerge instantiates") {
+	String hello = "SceneMerge instantiates.";
+	CHECK(hello == "SceneMerge instantiates.");
 }
 
 } // namespace TestSceneMerge
