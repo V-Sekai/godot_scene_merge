@@ -181,7 +181,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String
 
 Node *MeshMergeMaterialRepack::_merge_mesh_instances(MeshMergeState p_mesh_merge_state, int p_index) {
 	Vector<MeshState> mesh_items = p_mesh_merge_state.mesh_items[p_index].meshes;
-	Node *p_root = p_mesh_merge_state.root;
+	Node *p_root = p_mesh_merge_state.root->duplicate();
 	const Vector<MeshState> &original_mesh_items = p_mesh_merge_state.original_mesh_items[p_index].meshes;
 	Array mesh_to_index_to_material;
 	Vector<Ref<Material> > material_cache;
@@ -200,7 +200,8 @@ Node *MeshMergeMaterialRepack::_merge_mesh_instances(MeshMergeState p_mesh_merge
 
 	xatlas::PackOptions pack_options;
 	Vector<AtlasLookupTexel> atlas_lookup;
-	_generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, material_cache, pack_options);
+	Error err = _generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, material_cache, pack_options);
+	ERR_FAIL_COND_V(err != OK, p_root);
 	atlas_lookup.resize(atlas->width * atlas->height);
 	HashMap<String, Ref<Image> > texture_atlas;
 	HashMap<int32_t, MaterialImageCache> material_image_cache;
@@ -363,7 +364,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Ref<B
 	return img;
 }
 
-void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
+Error MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
 		xatlas::PackOptions &pack_options) {
 	uint32_t mesh_count = 0;
 	for (int32_t mesh_i = 0; mesh_i < r_meshes.size(); mesh_i++) {
@@ -415,11 +416,12 @@ void MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector
 	}
 	pack_options.bilinear = true;
 	pack_options.padding = 16;
-	pack_options.texelsPerUnit = 0.0f;
-	pack_options.bruteForce = false;
+	pack_options.texelsPerUnit = 20.0f;
+	pack_options.bruteForce = true;
 	pack_options.blockAlign = true;
 	pack_options.resolution = 2048;
 	xatlas::ComputeCharts(atlas);
+	ERR_FAIL_COND_V(atlas->height == 0 || atlas->width == 0, ERR_INVALID_DATA);
 	xatlas::PackCharts(atlas, pack_options);
 }
 
