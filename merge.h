@@ -44,8 +44,8 @@ Copyright (c) 2013 Thekla, Inc
 Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 */
 
-#ifndef MESH_MERGE_MATERIAL_REPACK_H
-#define MESH_MERGE_MATERIAL_REPACK_H
+#ifndef MERGE_H
+#define MERGE_H
 
 #include "core/object/ref_counted.h"
 
@@ -191,4 +191,4 @@ public:
 	Node *merge(Node *p_root, Node *p_original_root, String p_output_path);
 };
 
-#endif
+#endif // MERGE_H
