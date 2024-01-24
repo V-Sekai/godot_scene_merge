@@ -666,6 +666,7 @@ bool MeshMergeMeshInstanceWithMaterialAtlas::MeshState::operator==(const MeshSta
 	}
 	return false;
 }
+
 Pair<int, int> MeshMergeMeshInstanceWithMaterialAtlas::calculate_coordinates(const Vector2 &sourceUv, int width, int height) {
 	int sx = static_cast<int>(sourceUv.x * width) % width;
 	int sy = static_cast<int>(sourceUv.y * height) % height;

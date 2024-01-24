@@ -64,24 +64,6 @@ private:
 		int num_components;
 		Ref<Image> image;
 	};
-
-	struct AtlasLookupTexel {
-		uint16_t material_index;
-		uint16_t x, y;
-	};
-
-	struct SetAtlasTexelArgs {
-		Ref<Image> atlas_data;
-		Ref<Image> source_texture;
-		AtlasLookupTexel *atlas_lookup = nullptr;
-		uint16_t material_index = 0;
-		Vector2 source_uvs[3];
-		uint32_t atlas_width = 0;
-		uint32_t atlas_height = 0;
-	};
-
-	const int32_t default_texture_length = 128;
-
 	struct ModelVertex {
 		Vector3 pos;
 		Vector3 normal;
@@ -96,6 +78,38 @@ private:
 	struct MaterialImageCache {
 		Ref<Image> albedo_img;
 	};
+	struct MeshMerge {
+		Vector<MeshState> meshes;
+		int vertex_count = 0;
+	};
+	struct MeshMergeState {
+		Vector<MeshMerge> mesh_items;
+		Vector<MeshMerge> original_mesh_items;
+		Node *root = nullptr;
+		Node *original_root = nullptr;
+		String output_path;
+	};
+protected:
+	static void _bind_methods();
+
+public:
+	const int32_t default_texture_length = 128;
+
+	struct AtlasLookupTexel {
+		uint16_t material_index = 0;
+		uint16_t x = 0;
+		uint16_t y = 0;
+	};
+	struct SetAtlasTexelArgs {
+		Ref<Image> atlas_data;
+		Ref<Image> source_texture;
+		AtlasLookupTexel *atlas_lookup = nullptr;
+		uint16_t material_index = 0;
+		Vector2 source_uvs[3];
+		uint32_t atlas_width = 0;
+		uint32_t atlas_height = 0;
+	};
+
 	struct MergeState {
 		Node *p_root;
 		xatlas::Atlas *atlas;
@@ -111,13 +125,11 @@ private:
 		HashMap<String, Ref<Image> > texture_atlas;
 		HashMap<int32_t, MaterialImageCache> material_image_cache;
 	};
-	struct MeshMerge {
-		Vector<MeshState> meshes;
-		int vertex_count = 0;
-	};
 	static Vector2 interpolate_source_uvs(const Vector3 &bar, const SetAtlasTexelArgs *args);
 	static Pair<int, int> calculate_coordinates(const Vector2 &sourceUv, int width, int height);
 	static bool set_atlas_texel(void *param, int x, int y, const Vector3 &bar, const Vector3 &dx, const Vector3 &dy, float coverage);
+	Node *_merge_mesh_instances(MeshMergeState p_mesh_merge_state, int p_index);
+	Node *merge(Node *p_root, Node *p_original_root, String p_output_path);
 	Ref<Image> dilate(Ref<Image> source_image);
 	void _find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
 	void _generate_texture_atlas(MergeState &state, String texture_type);
@@ -127,20 +139,6 @@ private:
 	void scale_uvs_by_texture_dimension_larger(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices);
 	void map_mesh_to_index_to_material(Vector<MeshState> mesh_items, Array &vertex_to_material, Vector<Ref<Material> > &material_cache);
 	Node *_output(MergeState &state, int p_count);
-	struct MeshMergeState {
-		Vector<MeshMerge> mesh_items;
-		Vector<MeshMerge> original_mesh_items;
-		Node *root = nullptr;
-		Node *original_root = nullptr;
-		String output_path;
-	};
-	Node *_merge_mesh_instances(MeshMergeState p_mesh_merge_state, int p_index);
-
-protected:
-	static void _bind_methods();
-
-public:
-	Node *merge(Node *p_root, Node *p_original_root, String p_output_path);
 };
 
 #endif // MERGE_H
