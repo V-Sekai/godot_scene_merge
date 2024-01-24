@@ -290,7 +290,7 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / img_width;
 					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / img_height;
 				}
-				Triangle tri(v[0], v[1], v[2], Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1));
+				MeshMergeTriangle tri(v[0], v[1], v[2], Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1));
 
 				tri.drawAA(setAtlasTexel, &args);
 			}
@@ -676,7 +676,7 @@ bool MeshMergeMaterialRepack::MeshState::operator==(const MeshState &rhs) const 
 	return false;
 }
 
-MeshMergeMaterialRepack::ClippedTriangle::ClippedTriangle(const Vector2 &a, const Vector2 &b, const Vector2 &c) {
+MeshMergeClippedTriangle::MeshMergeClippedTriangle(const Vector2 &a, const Vector2 &b, const Vector2 &c) {
 	m_area = 0;
 	m_numVertices = 3;
 	m_activeVertexBuffer = 0;
@@ -687,7 +687,7 @@ MeshMergeMaterialRepack::ClippedTriangle::ClippedTriangle(const Vector2 &a, cons
 	m_vertexBuffers[1] = m_verticesB;
 }
 
-void MeshMergeMaterialRepack::ClippedTriangle::clipHorizontalPlane(float offset, float clipdirection) {
+void MeshMergeClippedTriangle::clipHorizontalPlane(float offset, float clipdirection) {
 	Vector2 *v = m_vertexBuffers[m_activeVertexBuffer];
 	m_activeVertexBuffer ^= 1;
 	Vector2 *v2 = m_vertexBuffers[m_activeVertexBuffer];
@@ -712,7 +712,7 @@ void MeshMergeMaterialRepack::ClippedTriangle::clipHorizontalPlane(float offset,
 	m_numVertices = p;
 }
 
-void MeshMergeMaterialRepack::ClippedTriangle::clipVerticalPlane(float offset, float clipdirection) {
+void MeshMergeClippedTriangle::clipVerticalPlane(float offset, float clipdirection) {
 	Vector2 *v = m_vertexBuffers[m_activeVertexBuffer];
 	m_activeVertexBuffer ^= 1;
 	Vector2 *v2 = m_vertexBuffers[m_activeVertexBuffer];
@@ -737,7 +737,7 @@ void MeshMergeMaterialRepack::ClippedTriangle::clipVerticalPlane(float offset, f
 	m_numVertices = p;
 }
 
-void MeshMergeMaterialRepack::ClippedTriangle::computeAreaCentroid() {
+void MeshMergeClippedTriangle::computeAreaCentroid() {
 	Vector2 *v = m_vertexBuffers[m_activeVertexBuffer];
 	v[m_numVertices] = v[0];
 	m_area = 0;
@@ -757,7 +757,7 @@ void MeshMergeMaterialRepack::ClippedTriangle::computeAreaCentroid() {
 	}
 }
 
-void MeshMergeMaterialRepack::ClippedTriangle::clipAABox(float x0, float y0, float x1, float y1) {
+void MeshMergeClippedTriangle::clipAABox(float x0, float y0, float x1, float y1) {
 	clipVerticalPlane(x0, -1);
 	clipHorizontalPlane(y0, -1);
 	clipVerticalPlane(x1, 1);
@@ -765,15 +765,15 @@ void MeshMergeMaterialRepack::ClippedTriangle::clipAABox(float x0, float y0, flo
 	computeAreaCentroid();
 }
 
-Vector2 MeshMergeMaterialRepack::ClippedTriangle::centroid() {
+Vector2 MeshMergeClippedTriangle::centroid() {
 	return m_centroid;
 }
 
-float MeshMergeMaterialRepack::ClippedTriangle::area() {
+float MeshMergeClippedTriangle::area() {
 	return m_area;
 }
 
-MeshMergeMaterialRepack::Triangle::Triangle(const Vector2 &p_v0, const Vector2 &p_v1, const Vector2 &p_v2, const Vector3 &p_t0, const Vector3 &p_t1, const Vector3 &p_t2) {
+MeshMergeTriangle::MeshMergeTriangle(const Vector2 &p_v0, const Vector2 &p_v1, const Vector2 &p_v2, const Vector3 &p_t0, const Vector3 &p_t1, const Vector3 &p_t2) {
 	// Init vertices.
 	this->v1 = p_v0;
 	this->v2 = p_v2;
@@ -789,7 +789,7 @@ MeshMergeMaterialRepack::Triangle::Triangle(const Vector2 &p_v0, const Vector2 &
 	computeUnitInwardNormals();
 }
 
-bool MeshMergeMaterialRepack::Triangle::computeDeltas() {
+bool MeshMergeTriangle::computeDeltas() {
 	Vector2 e0 = v3 - v1;
 	Vector2 e1 = v2 - v1;
 	Vector3 de0 = t3 - t1;
@@ -807,7 +807,7 @@ bool MeshMergeMaterialRepack::Triangle::computeDeltas() {
 	return true;
 }
 
-void MeshMergeMaterialRepack::Triangle::flipBackface() {
+void MeshMergeTriangle::flipBackface() {
 	// check if triangle is backfacing, if so, swap two vertices
 	if (((v3.x - v1.x) * (v2.y - v1.y) - (v3.y - v1.y) * (v2.x - v1.x)) < 0) {
 		Vector2 hv = v1;
@@ -819,7 +819,7 @@ void MeshMergeMaterialRepack::Triangle::flipBackface() {
 	}
 }
 
-void MeshMergeMaterialRepack::Triangle::computeUnitInwardNormals() {
+void MeshMergeTriangle::computeUnitInwardNormals() {
 	n1 = v1 - v2;
 	n1 = Vector2(-n1.y, n1.x);
 	n1 = n1 * (1.0f / sqrtf(n1.x * n1.x + n1.y * n1.y));
@@ -831,7 +831,7 @@ void MeshMergeMaterialRepack::Triangle::computeUnitInwardNormals() {
 	n3 = n3 * (1.0f / sqrtf(n3.x * n3.x + n3.y * n3.y));
 }
 
-bool MeshMergeMaterialRepack::Triangle::drawAA(SamplingCallback cb, void *param) {
+bool MeshMergeTriangle::drawAA(MeshMergeSamplingCallback cb, void *param) {
 	const float PX_INSIDE = 1.0f / sqrtf(2.0f);
 	const float PX_OUTSIDE = -1.0f / sqrtf(2.0f);
 	const float BK_SIZE = 8;
@@ -907,7 +907,7 @@ bool MeshMergeMaterialRepack::Triangle::drawAA(SamplingCallback cb, void *param)
 							}
 						} else if ((CX1 >= PX_OUTSIDE) && (CX2 >= PX_OUTSIDE) && (CX3 >= PX_OUTSIDE)) {
 							// triangle partially covers pixel. do clipping.
-							ClippedTriangle ct(v1 - Vector2(x, y), v2 - Vector2(x, y), v3 - Vector2(x, y));
+							MeshMergeClippedTriangle ct(v1 - Vector2(x, y), v2 - Vector2(x, y), v3 - Vector2(x, y));
 							ct.clipAABox(-0.5, -0.5, 0.5, 0.5);
 							float area = ct.area();
 							if (area > 0.0f) {
