@@ -174,12 +174,12 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String
 	}
 
 	for (int32_t items_i = 0; items_i < mesh_merge_state.mesh_items.size(); items_i++) {
-		p_root = _merge_list(mesh_merge_state, items_i);
+		p_root = _merge_mesh_instances(mesh_merge_state, items_i);
 	}
 	return p_root;
 }
 
-Node *MeshMergeMaterialRepack::_merge_list(MeshMergeState p_mesh_merge_state, int p_index) {
+Node *MeshMergeMaterialRepack::_merge_mesh_instances(MeshMergeState p_mesh_merge_state, int p_index) {
 	Vector<MeshState> mesh_items = p_mesh_merge_state.mesh_items[p_index].meshes;
 	Node *p_root = p_mesh_merge_state.root;
 	const Vector<MeshState> &original_mesh_items = p_mesh_merge_state.original_mesh_items[p_index].meshes;

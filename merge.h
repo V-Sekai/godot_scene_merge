@@ -182,7 +182,7 @@ private:
 		Node *original_root = nullptr;
 		String output_path;
 	};
-	Node *_merge_list(MeshMergeState p_mesh_merge_state, int p_index);
+	Node *_merge_mesh_instances(MeshMergeState p_mesh_merge_state, int p_index);
 
 protected:
 	static void _bind_methods();
