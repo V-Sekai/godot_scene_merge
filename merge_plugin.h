@@ -87,4 +87,5 @@ SceneMergePlugin::SceneMergePlugin() {
 	file_export_lib->set_title(TTR("Merge Scene"));
 	EditorNode::get_singleton()->add_tool_menu_item("Merge Scene", callable_mp(this, &SceneMergePlugin::merge));
 }
-#endif
+
+#endif // MERGE_PLUGIN_H
