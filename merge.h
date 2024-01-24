@@ -56,7 +56,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 
 #include "thirdparty/xatlas/xatlas.h"
 
-class MeshMergeMaterialRepack : public RefCounted {
+class MeshMergeMeshInstanceWithMaterialAtlas : public RefCounted {
 private:
 	struct TextureData {
 		uint16_t width;

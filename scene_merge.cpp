@@ -7,7 +7,7 @@ void SceneMerge::merge(const String p_file, Node *p_root_node) {
 	PackedScene *scene = memnew(PackedScene);
 	scene->pack(p_root_node);
 	Node *root = scene->instantiate();
-	Ref<MeshMergeMaterialRepack> repack;
+	Ref<MeshMergeMeshInstanceWithMaterialAtlas> repack;
 	repack.instantiate();
 	root = repack->merge(root, p_root_node, p_file);
 	ERR_FAIL_COND(!root);

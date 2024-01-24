@@ -69,7 +69,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 
 #include "merge.h"
 
-bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float) {
+bool MeshMergeMeshInstanceWithMaterialAtlas::setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float) {
 	SetAtlasTexelArgs *args = static_cast<SetAtlasTexelArgs *>(param);
 	if (args->sourceTexture.is_valid()) {
 		// Interpolate source UVs using barycentrics.
@@ -102,7 +102,7 @@ bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vec
 	return false;
 }
 
-void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner) {
+void MeshMergeMeshInstanceWithMaterialAtlas::_find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner) {
 	MeshInstance3D *mi = cast_to<MeshInstance3D>(p_current_node);
 	if (mi && mi->is_visible() && mi->get_mesh().is_valid()) {
 		Ref<Mesh> array_mesh = mi->get_mesh();
@@ -144,11 +144,11 @@ void MeshMergeMaterialRepack::_find_all_mesh_instances(Vector<MeshMerge> &r_item
 	}
 }
 
-void MeshMergeMaterialRepack::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("merge", "root", "original_root", "output_path"), &MeshMergeMaterialRepack::merge);
+void MeshMergeMeshInstanceWithMaterialAtlas::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("merge", "root", "original_root", "output_path"), &MeshMergeMeshInstanceWithMaterialAtlas::merge);
 }
 
-Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String p_output_path) {
+Node *MeshMergeMeshInstanceWithMaterialAtlas::merge(Node *p_root, Node *p_original_root, String p_output_path) {
 	MeshMergeState mesh_merge_state;
 	mesh_merge_state.root = p_root;
 	mesh_merge_state.original_root = p_original_root;
@@ -168,7 +168,7 @@ Node *MeshMergeMaterialRepack::merge(Node *p_root, Node *p_original_root, String
 	return p_root;
 }
 
-Node *MeshMergeMaterialRepack::_merge_mesh_instances(MeshMergeState p_mesh_merge_state, int p_index) {
+Node *MeshMergeMeshInstanceWithMaterialAtlas::_merge_mesh_instances(MeshMergeState p_mesh_merge_state, int p_index) {
 	Vector<MeshState> mesh_items = p_mesh_merge_state.mesh_items[p_index].meshes;
 	Node *p_root = p_mesh_merge_state.root->duplicate();
 	const Vector<MeshState> &original_mesh_items = p_mesh_merge_state.original_mesh_items[p_index].meshes;
@@ -245,7 +245,7 @@ Node *MeshMergeMaterialRepack::_merge_mesh_instances(MeshMergeState p_mesh_merge
 	return p_root;
 }
 
-void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String texture_type) {
+void MeshMergeMeshInstanceWithMaterialAtlas::_generate_texture_atlas(MergeState &state, String texture_type) {
 	Ref<Image> atlas_img = Image::create_empty(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
 	ERR_FAIL_COND_MSG(atlas_img.is_null(), "Failed to create empty atlas image.");
 
@@ -311,7 +311,7 @@ void MeshMergeMaterialRepack::_generate_texture_atlas(MergeState &state, String 
 	state.texture_atlas.insert(texture_type, atlas_img);
 }
 
-Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Ref<BaseMaterial3D> material) {
+Ref<Image> MeshMergeMeshInstanceWithMaterialAtlas::_get_source_texture(MergeState &state, Ref<BaseMaterial3D> material) {
 	int32_t width = 0, height = 0;
 	Vector<Ref<Texture2D> > textures = { material->get_texture(BaseMaterial3D::TEXTURE_ALBEDO) };
 	Vector<Ref<Image> > images;
@@ -353,7 +353,7 @@ Ref<Image> MeshMergeMaterialRepack::_get_source_texture(MergeState &state, Ref<B
 	return img;
 }
 
-Error MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
+Error MeshMergeMeshInstanceWithMaterialAtlas::_generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
 		xatlas::PackOptions &pack_options) {
 	uint32_t mesh_count = 0;
 	for (int32_t mesh_i = 0; mesh_i < r_meshes.size(); mesh_i++) {
@@ -414,7 +414,7 @@ Error MeshMergeMaterialRepack::_generate_atlas(const int32_t p_num_meshes, Vecto
 	xatlas::PackCharts(atlas, pack_options);
 }
 
-void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension_larger(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_mesh_to_index_to_material, Vector<Vector<ModelVertex> > &r_model_vertices) {
+void MeshMergeMeshInstanceWithMaterialAtlas::scale_uvs_by_texture_dimension_larger(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_mesh_to_index_to_material, Vector<Vector<ModelVertex> > &r_model_vertices) {
 	int32_t total_surface_count = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		total_surface_count += mesh_items[mesh_i].mesh->get_surface_count();
@@ -510,7 +510,7 @@ void MeshMergeMaterialRepack::scale_uvs_by_texture_dimension_larger(const Vector
 	}
 }
 
-Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
+Ref<Image> MeshMergeMeshInstanceWithMaterialAtlas::dilate(Ref<Image> source_image) {
 	Ref<Image> target_image = source_image->duplicate();
 	target_image->convert(Image::FORMAT_RGBA8);
 	Vector<uint8_t> pixels;
@@ -546,7 +546,7 @@ Ref<Image> MeshMergeMaterialRepack::dilate(Ref<Image> source_image) {
 	return target_image;
 }
 
-void MeshMergeMaterialRepack::map_mesh_to_index_to_material(Vector<MeshState> mesh_items, Array &mesh_to_index_to_material, Vector<Ref<Material> > &material_cache) {
+void MeshMergeMeshInstanceWithMaterialAtlas::map_mesh_to_index_to_material(Vector<MeshState> mesh_items, Array &mesh_to_index_to_material, Vector<Ref<Material> > &material_cache) {
 	float largest_dimension = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
@@ -587,12 +587,12 @@ void MeshMergeMaterialRepack::map_mesh_to_index_to_material(Vector<MeshState> me
 	}
 }
 
-Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
+Node *MeshMergeMeshInstanceWithMaterialAtlas::_output(MergeState &state, int p_count) {
 	if (state.atlas->width == 0 || state.atlas->height == 0) {
 		return state.p_root;
 	}
 	print_line(vformat("Atlas size: (%d, %d)", state.atlas->width, state.atlas->height));
-	MeshMergeMaterialRepack::TextureData texture_data;
+	MeshMergeMeshInstanceWithMaterialAtlas::TextureData texture_data;
 	for (int32_t mesh_i = 0; mesh_i < state.r_mesh_items.size(); mesh_i++) {
 		if (state.r_mesh_items[mesh_i].mesh_instance->get_parent()) {
 			Node3D *node_3d = memnew(Node3D);
@@ -669,7 +669,7 @@ Node *MeshMergeMaterialRepack::_output(MergeState &state, int p_count) {
 	return state.p_root;
 }
 
-bool MeshMergeMaterialRepack::MeshState::operator==(const MeshState &rhs) const {
+bool MeshMergeMeshInstanceWithMaterialAtlas::MeshState::operator==(const MeshState &rhs) const {
 	if (rhs.mesh == mesh && rhs.path == path && rhs.mesh_instance == mesh_instance) {
 		return true;
 	}
