@@ -39,17 +39,15 @@ TEST_CASE("[Modules][SceneMerge] MeshMergeMeshInstanceWithMaterialAtlasTest") {
 	args.source_texture = Image::create_empty(1024, 1024, false, Image::FORMAT_RGBA8);
 	args.source_texture->fill(Color());
 	MeshMergeMeshInstanceWithMaterialAtlas::AtlasLookupTexel lookup;
-	lookup.x = 512;
-	lookup.y = 512;
-	lookup.material_index = 0;
-	args.atlas_lookup = &lookup;
-	args.source_uvs[0] = Vector2(0.5, 0.5);
-	args.source_uvs[1] = Vector2(0.25, 0.75);
-	args.source_uvs[2] = Vector2(0.75, 0.25);
-	args.atlas_width = 1024;
-	args.atlas_height = 1024;
-	bool result = MeshMergeMeshInstanceWithMaterialAtlas::set_atlas_texel(&args, 512, 512, Vector3(0.33, 0.33, 0.33), Vector3(), Vector3(), 0.0f);
-	CHECK(result == true);
+    args.atlas_lookup = &lookup;
+    lookup.x = 512;
+    lookup.y = 512;
+    bool result = MeshMergeMeshInstanceWithMaterialAtlas::set_atlas_texel(&args, 512, 512, Vector3(0.33, 0.33, 0.33), Vector3(), Vector3(), 0.0f);
+    CHECK(result);
+    lookup.x = 1023;
+    lookup.y = 1023;
+    result = MeshMergeMeshInstanceWithMaterialAtlas::set_atlas_texel(&args, 1023, 1023, Vector3(0.33, 0.33, 0.33), Vector3(), Vector3(), 0.0f);
+    CHECK(result);
 }
 
 } // namespace TestSceneMerge

@@ -70,23 +70,21 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "merge.h"
 
 bool MeshMergeMeshInstanceWithMaterialAtlas::set_atlas_texel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float) {
+	ERR_FAIL_NULL_V(param, false);
 	SetAtlasTexelArgs *args = static_cast<SetAtlasTexelArgs *>(param);
+	ERR_FAIL_NULL_V(args, false);
 	if (args->source_texture.is_valid()) {
 		const Vector2 source_uv = interpolate_source_uvs(bar, args);
-
 		int _width = args->source_texture->get_width() - 1;
 		int _height = args->source_texture->get_height() - 1;
-
 		Pair<int, int> coordinates = calculate_coordinates(source_uv, _width, _height);
-
 		const Color color = args->source_texture->get_pixel(coordinates.first, coordinates.second);
 		args->atlas_data->set_pixel(x, y, color);
-
-		AtlasLookupTexel &lookup = args->atlas_lookup[x * y + args->atlas_width];
+		int32_t index = x * y + args->atlas_width;
+		AtlasLookupTexel &lookup = args->atlas_lookup[index];
 		lookup.material_index = args->material_index;
 		lookup.x = static_cast<uint16_t>(coordinates.first);
 		lookup.y = static_cast<uint16_t>(coordinates.second);
-
 		return true;
 	}
 	return false;
