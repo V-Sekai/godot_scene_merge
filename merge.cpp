@@ -1,32 +1,32 @@
-/*************************************************************************/
-/*  mesh.cpp                                                             */
-/*************************************************************************/
-/*                       This file is part of:                           */
-/*                           GODOT ENGINE                                */
-/*                      https://godotengine.org                          */
-/*************************************************************************/
-/* Copyright (c) 2007-2019 Juan Linietsky, Ariel Manzur.                 */
-/* Copyright (c) 2014-2019 Godot Engine contributors (cf. AUTHORS.md)    */
-/*                                                                       */
-/* Permission is hereby granted, free of charge, to any person obtaining */
-/* a copy of this software and associated documentation files (the       */
-/* "Software"), to deal in the Software without restriction, including   */
-/* without limitation the rights to use, copy, modify, merge, publish,   */
-/* distribute, sublicense, and/or sell copies of the Software, and to    */
-/* permit persons to whom the Software is furnished to do so, subject to */
-/* the following conditions:                                             */
-/*                                                                       */
-/* The above copyright notice and this permission notice shall be        */
-/* included in all copies or substantial portions of the Software.       */
-/*                                                                       */
-/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
-/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF    */
-/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.*/
-/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  */
-/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,  */
-/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE     */
-/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                */
-/*************************************************************************/
+/**************************************************************************/
+/*  merge.cpp                                                             */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
 
 /*
 xatlas
@@ -108,6 +108,12 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_find_all_mesh_instances(Vector<Mes
 		Ref<Mesh> array_mesh = mi->get_mesh();
 		bool has_blends = false, has_bones = false, has_transparency = false;
 
+		// Store the original materials
+		Vector<Ref<Material>> original_materials;
+		for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
+			original_materials.push_back(array_mesh->surface_get_material(surface_i));
+		}
+
 		for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 			Ref<Material> active_material = mi->get_active_material(surface_i);
 			if (active_material.is_null()) {
@@ -121,10 +127,6 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_find_all_mesh_instances(Vector<Mes
 			Ref<BaseMaterial3D> base_mat = array_mesh->surface_get_material(surface_i);
 			if (base_mat.is_valid()) {
 				has_transparency |= base_mat->get_transparency() != BaseMaterial3D::TRANSPARENCY_DISABLED;
-			}
-
-			if (has_blends || has_bones || has_transparency) {
-				break;
 			}
 
 			MeshState mesh_state;
@@ -143,6 +145,7 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_find_all_mesh_instances(Vector<Mes
 		_find_all_mesh_instances(r_items, p_current_node->get_child(child_i), p_owner);
 	}
 }
+
 
 void MeshMergeMeshInstanceWithMaterialAtlas::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("merge", "root", "original_root", "output_path"), &MeshMergeMeshInstanceWithMaterialAtlas::merge);
@@ -408,9 +411,8 @@ Error MeshMergeMeshInstanceWithMaterialAtlas::_generate_atlas(const int32_t p_nu
 	pack_options.texelsPerUnit = 20.0f;
 	pack_options.bruteForce = true;
 	pack_options.blockAlign = true;
-	pack_options.resolution = 2048;
+	pack_options.resolution = 0;
 	xatlas::ComputeCharts(atlas);
-	ERR_FAIL_COND_V(atlas->height == 0 || atlas->width == 0, ERR_INVALID_DATA);
 	xatlas::PackCharts(atlas, pack_options);
 }
 
