@@ -89,6 +89,7 @@ private:
 		Node *original_root = nullptr;
 		String output_path;
 	};
+
 protected:
 	static void _bind_methods();
 
@@ -111,8 +112,8 @@ public:
 	};
 
 	struct MergeState {
-		Node *p_root;
-		xatlas::Atlas *atlas;
+		Node *p_root = nullptr;
+		xatlas::Atlas *atlas = nullptr;
 		Vector<MeshState> &r_mesh_items;
 		Array &vertex_to_material;
 		const Vector<Vector<Vector2> > uvs;
