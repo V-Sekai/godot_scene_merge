@@ -69,33 +69,23 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 
 #include "merge.h"
 
-bool MeshMergeMeshInstanceWithMaterialAtlas::setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float) {
+bool MeshMergeMeshInstanceWithMaterialAtlas::set_atlas_texel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float) {
 	SetAtlasTexelArgs *args = static_cast<SetAtlasTexelArgs *>(param);
-	if (args->sourceTexture.is_valid()) {
-		// Interpolate source UVs using barycentrics.
-		const Vector2 sourceUv = args->source_uvs[0] * bar.x + args->source_uvs[1] * bar.y + args->source_uvs[2] * bar.z;
+	if (args->source_texture.is_valid()) {
+		const Vector2 source_uv = interpolate_source_uvs(bar, args);
 
-		// Keep coordinates in range of texture dimensions.
-		int _width = args->sourceTexture->get_width() - 1;
-		int _height = args->sourceTexture->get_height() - 1;
+		int _width = args->source_texture->get_width() - 1;
+		int _height = args->source_texture->get_height() - 1;
 
-		int sx = static_cast<int>(sourceUv.x * _width) % _width;
-		int sy = static_cast<int>(sourceUv.y * _height) % _height;
+		Pair<int, int> coordinates = calculate_coordinates(source_uv, _width, _height);
 
-		if (sx < 0) {
-			sx += _width;
-		}
-		if (sy < 0) {
-			sy += _height;
-		}
-
-		const Color color = args->sourceTexture->get_pixel(sx, sy);
-		args->atlasData->set_pixel(x, y, color);
+		const Color color = args->source_texture->get_pixel(coordinates.first, coordinates.second);
+		args->atlas_data->set_pixel(x, y, color);
 
 		AtlasLookupTexel &lookup = args->atlas_lookup[x * y + args->atlas_width];
 		lookup.material_index = args->material_index;
-		lookup.x = static_cast<uint16_t>(sx);
-		lookup.y = static_cast<uint16_t>(sy);
+		lookup.x = static_cast<uint16_t>(coordinates.first);
+		lookup.y = static_cast<uint16_t>(coordinates.second);
 
 		return true;
 	}
@@ -109,7 +99,7 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_find_all_mesh_instances(Vector<Mes
 		bool has_blends = false, has_bones = false, has_transparency = false;
 
 		// Store the original materials
-		Vector<Ref<Material>> original_materials;
+		Vector<Ref<Material> > original_materials;
 		for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 			original_materials.push_back(array_mesh->surface_get_material(surface_i));
 		}
@@ -145,7 +135,6 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_find_all_mesh_instances(Vector<Mes
 		_find_all_mesh_instances(r_items, p_current_node->get_child(child_i), p_owner);
 	}
 }
-
 
 void MeshMergeMeshInstanceWithMaterialAtlas::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("merge", "root", "original_root", "output_path"), &MeshMergeMeshInstanceWithMaterialAtlas::merge);
@@ -274,8 +263,8 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_generate_texture_atlas(MergeState 
 
 			img->convert(Image::FORMAT_RGBA8);
 			SetAtlasTexelArgs args;
-			args.sourceTexture = img;
-			args.atlasData = atlas_img;
+			args.source_texture = img;
+			args.atlas_data = atlas_img;
 			args.atlas_lookup = state.atlas_lookup.ptrw();
 			args.atlas_height = state.atlas->height;
 			args.atlas_width = state.atlas->width;
@@ -295,7 +284,7 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_generate_texture_atlas(MergeState 
 				}
 				MeshMergeTriangle tri(v[0], v[1], v[2], Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1));
 
-				tri.drawAA(setAtlasTexel, &args);
+				tri.drawAA(set_atlas_texel, &args);
 			}
 		}
 #ifdef TOOLS_ENABLED
@@ -676,4 +665,21 @@ bool MeshMergeMeshInstanceWithMaterialAtlas::MeshState::operator==(const MeshSta
 		return true;
 	}
 	return false;
+}
+Pair<int, int> MeshMergeMeshInstanceWithMaterialAtlas::calculate_coordinates(const Vector2 &sourceUv, int width, int height) {
+	int sx = static_cast<int>(sourceUv.x * width) % width;
+	int sy = static_cast<int>(sourceUv.y * height) % height;
+
+	if (sx < 0) {
+		sx += width;
+	}
+	if (sy < 0) {
+		sy += height;
+	}
+
+	return Pair<int, int>(sx, sy);
+}
+
+Vector2 MeshMergeMeshInstanceWithMaterialAtlas::interpolate_source_uvs(const Vector3 &bar, const SetAtlasTexelArgs *args) {
+	return args->source_uvs[0] * bar.x + args->source_uvs[1] * bar.y + args->source_uvs[2] * bar.z;
 }

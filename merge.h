@@ -61,7 +61,7 @@ private:
 	struct TextureData {
 		uint16_t width;
 		uint16_t height;
-		int numComponents;
+		int num_components;
 		Ref<Image> image;
 	};
 
@@ -71,8 +71,8 @@ private:
 	};
 
 	struct SetAtlasTexelArgs {
-		Ref<Image> atlasData;
-		Ref<Image> sourceTexture;
+		Ref<Image> atlas_data;
+		Ref<Image> source_texture;
 		AtlasLookupTexel *atlas_lookup = nullptr;
 		uint16_t material_index = 0;
 		Vector2 source_uvs[3];
@@ -115,7 +115,9 @@ private:
 		Vector<MeshState> meshes;
 		int vertex_count = 0;
 	};
-	static bool setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &dx, const Vector3 &dy, float coverage);
+	static Vector2 interpolate_source_uvs(const Vector3 &bar, const SetAtlasTexelArgs *args);
+	static Pair<int, int> calculate_coordinates(const Vector2 &sourceUv, int width, int height);
+	static bool set_atlas_texel(void *param, int x, int y, const Vector3 &bar, const Vector3 &dx, const Vector3 &dy, float coverage);
 	Ref<Image> dilate(Ref<Image> source_image);
 	void _find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
 	void _generate_texture_atlas(MergeState &state, String texture_type);

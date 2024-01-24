@@ -4,6 +4,7 @@
 
 #include "tests/test_macros.h"
 
+#include "modules/scene_merge/merge.h"
 #include "modules/scene_merge/mesh_merge_triangle.h"
 namespace TestSceneMerge {
 
@@ -48,6 +49,11 @@ TEST_CASE("[Modules][SceneMerge] MeshMergeTriangle drawAA - Negative Test") {
 	MeshMergeTriangle triangle(v0, v1, v2, t0, t1, t2);
 
 	CHECK_FALSE(triangle.drawAA(mock_callback_negative, nullptr));
+}
+
+TEST_CASE("[Modules][SceneMerge] MeshMergeMeshInstanceWithMaterialAtlasTest") {
+	Ref<MeshMergeMeshInstanceWithMaterialAtlas> instance;
+    instance.instantiate();
 }
 
 } // namespace TestSceneMerge
