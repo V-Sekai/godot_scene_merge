@@ -68,17 +68,6 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 
 #include "merge.h"
 
-void SceneMerge::merge(const String p_file, Node *p_root_node) {
-	PackedScene *scene = memnew(PackedScene);
-	scene->pack(p_root_node);
-	Node *root = scene->instantiate();
-	Ref<MeshMergeMaterialRepack> repack;
-	repack.instantiate();
-	root = repack->merge(root, p_root_node, p_file);
-	ERR_FAIL_COND(!root);
-	scene->pack(root);
-	ResourceSaver::save(scene, p_file);
-}
 
 bool MeshMergeMaterialRepack::setAtlasTexel(void *param, int x, int y, const Vector3 &bar, const Vector3 &, const Vector3 &, float) {
     SetAtlasTexelArgs *args = static_cast<SetAtlasTexelArgs *>(param);

@@ -56,16 +56,6 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 
 #include "thirdparty/xatlas/xatlas.h"
 
-class SceneMerge : public RefCounted {
-private:
-	GDCLASS(SceneMerge, RefCounted);
-
-	void _dialog_action(String p_file);
-
-public:
-	void merge(const String p_file, Node *p_root_node);
-};
-
 class MeshMergeMaterialRepack : public RefCounted {
 private:
 	struct TextureData {
