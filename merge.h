@@ -59,6 +59,18 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 
 class MeshMergeMeshInstanceWithMaterialAtlas : public RefCounted {
 private:
+	static int godot_xatlas_print(const char *p_print_string, ...) {
+		if (is_print_verbose_enabled()) {
+			va_list args;
+			va_start(args, p_print_string);
+			char formatted_string[1024];
+			vsnprintf(formatted_string, sizeof(formatted_string), p_print_string, args);
+			va_end(args);
+			print_line_rich(String(formatted_string).strip_edges());
+		}
+		return OK;
+	}
+
 	struct TextureData {
 		uint16_t width;
 		uint16_t height;
@@ -73,6 +85,7 @@ private:
 	struct MeshState {
 		Ref<Mesh> mesh;
 		NodePath path;
+		int32_t index_offset = 0;
 		MeshInstance3D *mesh_instance;
 		bool operator==(const MeshState &rhs) const;
 		bool is_valid() const {
@@ -142,7 +155,6 @@ public:
 	static Vector2 interpolate_source_uvs(const Vector3 &bar, const SetAtlasTexelArgs *args);
 	static Pair<int, int> calculate_coordinates(const Vector2 &sourceUv, int width, int height);
 	static bool set_atlas_texel(void *param, int x, int y, const Vector3 &bar, const Vector3 &dx, const Vector3 &dy, float coverage);
-	Node *_merge_mesh_instances(MeshMergeState p_mesh_merge_state, int p_index);
 	Node *merge(Node *p_root);
 	Ref<Image> dilate(Ref<Image> source_image);
 	void _find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
@@ -150,9 +162,12 @@ public:
 	Ref<Image> _get_source_texture(MergeState &state, Ref<BaseMaterial3D> material);
 	Error _generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
 			xatlas::PackOptions &pack_options);
-	void write_uvs(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices);
+	void write_uvs(const Vector<MeshState> &p_mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices);
 	void map_mesh_to_index_to_material(const Vector<MeshState> &mesh_items, Array &vertex_to_material, Vector<Ref<Material> > &material_cache);
 	Node *_output(MergeState &state, int p_count);
+	MeshMergeMeshInstanceWithMaterialAtlas() {
+		xatlas::SetPrint(&godot_xatlas_print, true);
+	}
 };
 
 #endif // MERGE_H
