@@ -50,6 +50,25 @@ TEST_CASE("[Modules][SceneMerge] MeshMergeMeshInstanceWithMaterialAtlasTest") {
     CHECK(result);
 }
 
+TEST_CASE("[Modules][SceneMerge] CalculateCoordinates") {
+    Vector2 source_uv(0.5, 0.5);
+    int width = 100;
+    int height = 200;
+    Pair<int, int> result = MeshMergeMeshInstanceWithMaterialAtlas::calculate_coordinates(source_uv, width, height);
+    CHECK_EQ(result.first, 50);
+    CHECK_EQ(result.second, 100);
+
+    source_uv = Vector2(1.0, 1.0);
+    result = MeshMergeMeshInstanceWithMaterialAtlas::calculate_coordinates(source_uv, width, height);
+    CHECK_EQ(result.first, 0);
+    CHECK_EQ(result.second, 0);
+
+    source_uv = Vector2(1.5, 1.5);
+    result = MeshMergeMeshInstanceWithMaterialAtlas::calculate_coordinates(source_uv, width, height);
+    CHECK_EQ(result.first, 50);
+    CHECK_EQ(result.second, 100);
+}
+
 } // namespace TestSceneMerge
 
 #endif // TEST_SCENE_MERGE_H
