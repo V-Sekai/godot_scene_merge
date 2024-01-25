@@ -69,6 +69,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include <time.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <vector>
 
 #include "merge.h"
@@ -130,72 +131,68 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::merge(Node *p_root) {
 	mesh_merge_state.root = p_root->duplicate();
 	mesh_merge_state.mesh_items.resize(1);
 	_find_all_mesh_instances(mesh_merge_state.mesh_items, p_root, p_root);
+
 	for (int32_t items_i = 0; items_i < mesh_merge_state.mesh_items.size(); items_i++) {
-		p_root = _merge_mesh_instances(mesh_merge_state, items_i);
-	}
-	return p_root;
-}
-
-Node *MeshMergeMeshInstanceWithMaterialAtlas::_merge_mesh_instances(MeshMergeState p_mesh_merge_state, int p_index) {
-	Vector<MeshState> mesh_items = p_mesh_merge_state.mesh_items[p_index].meshes;
-	Node *p_root = p_mesh_merge_state.root->duplicate();
-	Array mesh_to_index_to_material;
-	Vector<Ref<Material> > material_cache;
-	map_mesh_to_index_to_material(mesh_items, mesh_to_index_to_material, material_cache);
-	Vector<Vector<Vector2> > uv_groups;
-	Vector<Vector<ModelVertex> > model_vertices;
-	write_uvs(mesh_items, mesh_items, uv_groups, mesh_to_index_to_material, model_vertices);
-	xatlas::Atlas *atlas = xatlas::Create();
-	int32_t num_surfaces = 0;
-	for (const MeshState &mesh_item : mesh_items) {
-		num_surfaces += mesh_item.mesh->get_surface_count();
-	}
-	xatlas::PackOptions pack_options;
-	Vector<AtlasLookupTexel> atlas_lookup;
-	Error err = _generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, material_cache, pack_options);
-	ERR_FAIL_COND_V(err != OK, p_root);
-	atlas_lookup.resize(atlas->width * atlas->height);
-	HashMap<String, Ref<Image> > texture_atlas;
-	HashMap<int32_t, MaterialImageCache> material_image_cache;
-	MergeState state{
-		p_root,
-		atlas,
-		mesh_items,
-		mesh_to_index_to_material,
-		uv_groups,
-		model_vertices,
-		p_root->get_name(),
-		pack_options,
-		atlas_lookup,
-		material_cache,
-		texture_atlas,
-		material_image_cache,
-	};
-
-#ifdef TOOLS_ENABLED
-	EditorProgress progress_scene_merge("gen_get_source_material", TTR("Get source material"), state.material_cache.size());
-	int step = 0;
-#endif
-
-	for (const Ref<Material> &abstract_material : state.material_cache) {
-#ifdef TOOLS_ENABLED
-		step++;
-#endif
-		Ref<BaseMaterial3D> material = abstract_material;
-		MaterialImageCache cache{
-			_get_source_texture(state, material),
+		int32_t p_index = items_i;
+		Vector<MeshState> mesh_items = mesh_merge_state.mesh_items[p_index].meshes;
+		Node *p_root = mesh_merge_state.root->duplicate();
+		Array mesh_to_index_to_material;
+		Vector<Ref<Material> > material_cache;
+		map_mesh_to_index_to_material(mesh_items, mesh_to_index_to_material, material_cache);
+		Vector<Vector<Vector2> > uv_groups;
+		Vector<Vector<ModelVertex> > model_vertices;
+		write_uvs(mesh_items, mesh_items, uv_groups, mesh_to_index_to_material, model_vertices);
+		xatlas::Atlas *atlas = xatlas::Create();
+		int32_t num_surfaces = 0;
+		for (const MeshState &mesh_item : mesh_items) {
+			num_surfaces += mesh_item.mesh->get_surface_count();
+		}
+		xatlas::PackOptions pack_options;
+		Vector<AtlasLookupTexel> atlas_lookup;
+		Error err = _generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, material_cache, pack_options);
+		ERR_FAIL_COND_V(err != OK, p_root);
+		atlas_lookup.resize(atlas->width * atlas->height);
+		HashMap<String, Ref<Image> > texture_atlas;
+		HashMap<int32_t, MaterialImageCache> material_image_cache;
+		MergeState state{
+			p_root,
+			atlas,
+			mesh_items,
+			mesh_to_index_to_material,
+			uv_groups,
+			model_vertices,
+			p_root->get_name(),
+			pack_options,
+			atlas_lookup,
+			material_cache,
+			texture_atlas,
+			material_image_cache,
 		};
-		int32_t material_i = state.material_cache.find(abstract_material);
-		state.material_image_cache[material_i == -1 ? state.material_image_cache.size() : material_i] = cache;
 
 #ifdef TOOLS_ENABLED
-		progress_scene_merge.step(TTR("Getting Source Material: ") + material->get_name() + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
+		EditorProgress progress_scene_merge("gen_get_source_material", TTR("Get source material"), state.material_cache.size());
+		int step = 0;
 #endif
+
+		for (const Ref<Material> &abstract_material : state.material_cache) {
+#ifdef TOOLS_ENABLED
+			step++;
+#endif
+			Ref<BaseMaterial3D> material = abstract_material;
+			MaterialImageCache cache{
+				_get_source_texture(state, material),
+			};
+			int32_t material_i = state.material_cache.find(abstract_material);
+			state.material_image_cache[material_i == -1 ? state.material_image_cache.size() : material_i] = cache;
+
+#ifdef TOOLS_ENABLED
+			progress_scene_merge.step(TTR("Getting Source Material: ") + material->get_name() + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
+#endif
+		}
+		_generate_texture_atlas(state, "albedo");
+		p_root = _output(state, p_index);
+		xatlas::Destroy(atlas);
 	}
-	_generate_texture_atlas(state, "albedo");
-	p_root = _output(state, p_index);
-	xatlas::Destroy(atlas);
-	return p_root;
 }
 
 void MeshMergeMeshInstanceWithMaterialAtlas::_generate_texture_atlas(MergeState &state, String texture_type) {
