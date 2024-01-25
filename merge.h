@@ -55,6 +55,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "scene/main/node.h"
 
 #include "thirdparty/xatlas/xatlas.h"
+#include <cstdint>
 
 class MeshMergeMeshInstanceWithMaterialAtlas : public RefCounted {
 private:
@@ -74,6 +75,21 @@ private:
 		NodePath path;
 		MeshInstance3D *mesh_instance;
 		bool operator==(const MeshState &rhs) const;
+		bool is_valid() const {
+			bool is_mesh_valid = mesh.is_valid();
+			if (!is_mesh_valid || mesh_instance == nullptr) {
+				return false;
+			}
+			int num_surfaces = mesh->get_surface_count();
+			for (int i = 0; i < num_surfaces; ++i) {
+				int num_vertices = mesh->surface_get_array_len(i);
+				int num_indices = mesh->surface_get_array_index_len(i);
+				if (num_vertices == 0 || num_indices == 0) {
+					return false;
+				}
+			}
+			return true;
+		}
 	};
 	struct MaterialImageCache {
 		Ref<Image> albedo_img;
@@ -84,10 +100,7 @@ private:
 	};
 	struct MeshMergeState {
 		Vector<MeshMerge> mesh_items;
-		Vector<MeshMerge> original_mesh_items;
 		Node *root = nullptr;
-		Node *original_root = nullptr;
-		String output_path;
 	};
 
 protected:
@@ -95,6 +108,7 @@ protected:
 
 public:
 	const int32_t default_texture_length = 128;
+	const float TEXEL_SIZE = 20.0f;
 
 	struct AtlasLookupTexel {
 		uint16_t material_index = 0;
@@ -119,7 +133,6 @@ public:
 		const Vector<Vector<Vector2> > uvs;
 		const Vector<Vector<ModelVertex> > &model_vertices;
 		String p_name;
-		String output_path;
 		const xatlas::PackOptions &pack_options;
 		Vector<AtlasLookupTexel> &atlas_lookup;
 		Vector<Ref<Material> > &material_cache;
@@ -130,15 +143,15 @@ public:
 	static Pair<int, int> calculate_coordinates(const Vector2 &sourceUv, int width, int height);
 	static bool set_atlas_texel(void *param, int x, int y, const Vector3 &bar, const Vector3 &dx, const Vector3 &dy, float coverage);
 	Node *_merge_mesh_instances(MeshMergeState p_mesh_merge_state, int p_index);
-	Node *merge(Node *p_root, Node *p_original_root, String p_output_path);
+	Node *merge(Node *p_root);
 	Ref<Image> dilate(Ref<Image> source_image);
 	void _find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner);
 	void _generate_texture_atlas(MergeState &state, String texture_type);
 	Ref<Image> _get_source_texture(MergeState &state, Ref<BaseMaterial3D> material);
 	Error _generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
 			xatlas::PackOptions &pack_options);
-	void scale_uvs_by_texture_dimension_larger(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices);
-	void map_mesh_to_index_to_material(Vector<MeshState> mesh_items, Array &vertex_to_material, Vector<Ref<Material> > &material_cache);
+	void write_uvs(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_vertex_to_material, Vector<Vector<ModelVertex> > &r_model_vertices);
+	void map_mesh_to_index_to_material(const Vector<MeshState> &mesh_items, Array &vertex_to_material, Vector<Ref<Material> > &material_cache);
 	Node *_output(MergeState &state, int p_count);
 };
 

@@ -45,6 +45,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 */
 
 #include "core/core_bind.h"
+#include "core/error/error_list.h"
 #include "core/io/image.h"
 #include "core/math/vector2.h"
 #include "core/math/vector3.h"
@@ -55,9 +56,12 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "modules/scene_merge/mesh_merge_triangle.h"
 #include "scene/3d/node_3d.h"
 #include "scene/animation/animation_player.h"
+#include "scene/resources/compressed_texture.h"
 #include "scene/resources/image_texture.h"
+#include "scene/resources/material.h"
 #include "scene/resources/mesh_data_tool.h"
 #include "scene/resources/packed_scene.h"
+#include "scene/resources/portable_compressed_texture.h"
 #include "scene/resources/surface_tool.h"
 
 #include "thirdparty/misc/rjm_texbleed.h"
@@ -94,29 +98,10 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_find_all_mesh_instances(Vector<Mes
 	MeshInstance3D *mi = cast_to<MeshInstance3D>(p_current_node);
 	if (mi && mi->is_visible() && mi->get_mesh().is_valid()) {
 		Ref<Mesh> array_mesh = mi->get_mesh();
-		bool has_blends = false, has_bones = false, has_transparency = false;
-
-		// Store the original materials
-		Vector<Ref<Material> > original_materials;
 		for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
-			original_materials.push_back(array_mesh->surface_get_material(surface_i));
-		}
-
-		for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
-			Ref<Material> active_material = mi->get_active_material(surface_i);
-			if (active_material.is_null()) {
-				active_material = Ref<StandardMaterial3D>(memnew(StandardMaterial3D));
-			}
+			Ref<BaseMaterial3D> active_material = mi->get_active_material(surface_i);
 			array_mesh->surface_set_material(surface_i, active_material);
-
 			Array array = array_mesh->surface_get_arrays(surface_i).duplicate(true);
-			has_bones |= PackedFloat32Array(array[ArrayMesh::ARRAY_BONES]).size() != 0;
-			has_blends |= array_mesh->get_blend_shape_count() != 0;
-			Ref<BaseMaterial3D> base_mat = array_mesh->surface_get_material(surface_i);
-			if (base_mat.is_valid()) {
-				has_transparency |= base_mat->get_transparency() != BaseMaterial3D::TRANSPARENCY_DISABLED;
-			}
-
 			MeshState mesh_state;
 			mesh_state.mesh = array_mesh;
 			if (mi->is_inside_tree()) {
@@ -125,7 +110,9 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_find_all_mesh_instances(Vector<Mes
 			mesh_state.mesh_instance = mi;
 			MeshMerge &mesh = r_items.write[r_items.size() - 1];
 			mesh.vertex_count += PackedVector3Array(array[ArrayMesh::ARRAY_VERTEX]).size();
-			mesh.meshes.push_back(mesh_state);
+			if (mesh_state.is_valid()) {
+				mesh.meshes.push_back(mesh_state);
+			}
 		}
 	}
 
@@ -135,23 +122,14 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_find_all_mesh_instances(Vector<Mes
 }
 
 void MeshMergeMeshInstanceWithMaterialAtlas::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("merge", "root", "original_root", "output_path"), &MeshMergeMeshInstanceWithMaterialAtlas::merge);
+	ClassDB::bind_method(D_METHOD("merge", "root"), &MeshMergeMeshInstanceWithMaterialAtlas::merge);
 }
 
-Node *MeshMergeMeshInstanceWithMaterialAtlas::merge(Node *p_root, Node *p_original_root, String p_output_path) {
+Node *MeshMergeMeshInstanceWithMaterialAtlas::merge(Node *p_root) {
 	MeshMergeState mesh_merge_state;
-	mesh_merge_state.root = p_root;
-	mesh_merge_state.original_root = p_original_root;
-	mesh_merge_state.output_path = p_output_path;
+	mesh_merge_state.root = p_root->duplicate();
 	mesh_merge_state.mesh_items.resize(1);
 	_find_all_mesh_instances(mesh_merge_state.mesh_items, p_root, p_root);
-
-	mesh_merge_state.original_mesh_items.resize(1);
-	_find_all_mesh_instances(mesh_merge_state.original_mesh_items, p_original_root, p_original_root);
-	if (mesh_merge_state.original_mesh_items.size() != mesh_merge_state.mesh_items.size()) {
-		return p_root;
-	}
-
 	for (int32_t items_i = 0; items_i < mesh_merge_state.mesh_items.size(); items_i++) {
 		p_root = _merge_mesh_instances(mesh_merge_state, items_i);
 	}
@@ -161,22 +139,17 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::merge(Node *p_root, Node *p_origin
 Node *MeshMergeMeshInstanceWithMaterialAtlas::_merge_mesh_instances(MeshMergeState p_mesh_merge_state, int p_index) {
 	Vector<MeshState> mesh_items = p_mesh_merge_state.mesh_items[p_index].meshes;
 	Node *p_root = p_mesh_merge_state.root->duplicate();
-	const Vector<MeshState> &original_mesh_items = p_mesh_merge_state.original_mesh_items[p_index].meshes;
 	Array mesh_to_index_to_material;
 	Vector<Ref<Material> > material_cache;
-
 	map_mesh_to_index_to_material(mesh_items, mesh_to_index_to_material, material_cache);
-
 	Vector<Vector<Vector2> > uv_groups;
 	Vector<Vector<ModelVertex> > model_vertices;
-	scale_uvs_by_texture_dimension_larger(original_mesh_items, mesh_items, uv_groups, mesh_to_index_to_material, model_vertices);
+	write_uvs(mesh_items, mesh_items, uv_groups, mesh_to_index_to_material, model_vertices);
 	xatlas::Atlas *atlas = xatlas::Create();
-
 	int32_t num_surfaces = 0;
 	for (const MeshState &mesh_item : mesh_items) {
 		num_surfaces += mesh_item.mesh->get_surface_count();
 	}
-
 	xatlas::PackOptions pack_options;
 	Vector<AtlasLookupTexel> atlas_lookup;
 	Error err = _generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, material_cache, pack_options);
@@ -184,7 +157,6 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::_merge_mesh_instances(MeshMergeSta
 	atlas_lookup.resize(atlas->width * atlas->height);
 	HashMap<String, Ref<Image> > texture_atlas;
 	HashMap<int32_t, MaterialImageCache> material_image_cache;
-
 	MergeState state{
 		p_root,
 		atlas,
@@ -193,7 +165,6 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::_merge_mesh_instances(MeshMergeSta
 		uv_groups,
 		model_vertices,
 		p_root->get_name(),
-		p_mesh_merge_state.output_path,
 		pack_options,
 		atlas_lookup,
 		material_cache,
@@ -221,16 +192,8 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::_merge_mesh_instances(MeshMergeSta
 		progress_scene_merge.step(TTR("Getting Source Material: ") + material->get_name() + " (" + itos(step) + "/" + itos(state.material_cache.size()) + ")", step);
 #endif
 	}
-
 	_generate_texture_atlas(state, "albedo");
-
-	if (state.atlas->width <= 0 && state.atlas->height <= 0) {
-		xatlas::Destroy(atlas);
-		return state.p_root;
-	}
-
 	p_root = _output(state, p_index);
-
 	xatlas::Destroy(atlas);
 	return p_root;
 }
@@ -239,11 +202,17 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_generate_texture_atlas(MergeState 
 	Ref<Image> atlas_img = Image::create_empty(state.atlas->width, state.atlas->height, false, Image::FORMAT_RGBA8);
 	ERR_FAIL_COND_MSG(atlas_img.is_null(), "Failed to create empty atlas image.");
 
-	// Rasterize chart triangles.
 #ifdef TOOLS_ENABLED
 	EditorProgress progress_texture_atlas("gen_mesh_atlas", TTR("Generate Atlas"), state.atlas->meshCount);
 	int step = 0;
 #endif
+
+	SetAtlasTexelArgs args;
+	args.atlas_data = atlas_img;
+	args.atlas_lookup = state.atlas_lookup.ptrw();
+	args.atlas_height = state.atlas->height;
+	args.atlas_width = state.atlas->width;
+
 	for (uint32_t mesh_i = 0; mesh_i < state.atlas->meshCount; mesh_i++) {
 		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
 		for (uint32_t chart_i = 0; chart_i < mesh.chartCount; chart_i++) {
@@ -260,25 +229,18 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_generate_texture_atlas(MergeState 
 			ERR_CONTINUE_MSG(Image::get_format_pixel_size(img->get_format()) > 4, "Float textures are not supported yet for texture type: " + texture_type);
 
 			img->convert(Image::FORMAT_RGBA8);
-			SetAtlasTexelArgs args;
 			args.source_texture = img;
-			args.atlas_data = atlas_img;
-			args.atlas_lookup = state.atlas_lookup.ptrw();
-			args.atlas_height = state.atlas->height;
-			args.atlas_width = state.atlas->width;
 			args.material_index = (uint16_t)chart.material;
+
 			for (uint32_t face_i = 0; face_i < chart.faceCount; face_i++) {
 				Vector2 v[3];
 				for (uint32_t l = 0; l < 3; l++) {
 					const uint32_t index = mesh.indexArray[chart.faceArray[face_i] * 3 + l];
 					const xatlas::Vertex &vertex = mesh.vertexArray[index];
 					v[l] = Vector2(vertex.uv[0], vertex.uv[1]);
-					int img_width = img->get_width();
-					int img_height = img->get_height();
-					ERR_CONTINUE_MSG(img_width == 0 || img_height == 0, "Image width or height is zero for texture type: " + texture_type);
 
-					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / img_width;
-					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / img_height;
+					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x;
+					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y;
 				}
 				MeshMergeTriangle tri(v[0], v[1], v[2], Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1));
 
@@ -345,23 +307,14 @@ Ref<Image> MeshMergeMeshInstanceWithMaterialAtlas::_get_source_texture(MergeStat
 
 Error MeshMergeMeshInstanceWithMaterialAtlas::_generate_atlas(const int32_t p_num_meshes, Vector<Vector<Vector2> > &r_uvs, xatlas::Atlas *atlas, const Vector<MeshState> &r_meshes, const Vector<Ref<Material> > material_cache,
 		xatlas::PackOptions &pack_options) {
+	if (r_meshes.is_empty()) {
+		return ERR_SKIP;
+	}
 	uint32_t mesh_count = 0;
 	for (int32_t mesh_i = 0; mesh_i < r_meshes.size(); mesh_i++) {
 		for (int32_t j = 0; j < r_meshes[mesh_i].mesh->get_surface_count(); j++) {
 			Array mesh = r_meshes[mesh_i].mesh->surface_get_arrays(j);
-			if (mesh.is_empty()) {
-				xatlas::UvMeshDecl meshDecl;
-				xatlas::AddUvMesh(atlas, meshDecl);
-				mesh_count++;
-				continue;
-			}
 			Array indices = mesh[ArrayMesh::ARRAY_INDEX];
-			if (!indices.size()) {
-				xatlas::UvMeshDecl meshDecl;
-				xatlas::AddUvMesh(atlas, meshDecl);
-				mesh_count++;
-				continue;
-			}
 			xatlas::UvMeshDecl meshDecl;
 			meshDecl.vertexCount = r_uvs[mesh_count].size();
 			meshDecl.vertexUvData = r_uvs[mesh_count].ptr();
@@ -377,38 +330,31 @@ Error MeshMergeMeshInstanceWithMaterialAtlas::_generate_atlas(const int32_t p_nu
 			for (int32_t index_i = 0; index_i < mesh_indices.size(); index_i++) {
 				Ref<Material> mat = r_meshes[mesh_i].mesh->surface_get_material(j);
 				int32_t material_i = material_cache.find(mat);
-				if (material_i < 0 || material_i >= material_cache.size()) {
-					continue;
-				}
-				if (material_i != -1) {
-					materials.write[index_i] = material_i;
-				}
+				materials.write[index_i] = material_i;
 			}
 			meshDecl.indexCount = indexes.size();
 			meshDecl.indexData = indexes.ptr();
 			meshDecl.indexFormat = xatlas::IndexFormat::UInt32;
 			meshDecl.faceMaterialData = materials.ptr();
 			xatlas::AddMeshError error = xatlas::AddUvMesh(atlas, meshDecl);
-			ERR_CONTINUE_MSG(error != xatlas::AddMeshError::Success, String("Error adding mesh ") + itos(mesh_i) + String(": ") + xatlas::StringForEnum(error));
+			ERR_CONTINUE_MSG(error != xatlas::AddMeshError::Success, vformat("Error adding mesh %d: %s", mesh_i, xatlas::StringForEnum(error)));
 			mesh_count++;
 		}
 	}
-	pack_options.bilinear = true;
 	pack_options.padding = 16;
-	pack_options.texelsPerUnit = 20.0f;
-	pack_options.bruteForce = true;
-	pack_options.blockAlign = true;
-	pack_options.resolution = 0;
+	pack_options.resolution = 4096;
+	pack_options.texelsPerUnit = TEXEL_SIZE;
+	pack_options.bruteForce = false;
 	xatlas::ComputeCharts(atlas);
 	xatlas::PackCharts(atlas, pack_options);
+	return OK;
 }
 
-void MeshMergeMeshInstanceWithMaterialAtlas::scale_uvs_by_texture_dimension_larger(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_mesh_to_index_to_material, Vector<Vector<ModelVertex> > &r_model_vertices) {
+void MeshMergeMeshInstanceWithMaterialAtlas::write_uvs(const Vector<MeshState> &original_mesh_items, Vector<MeshState> &mesh_items, Vector<Vector<Vector2> > &uv_groups, Array &r_mesh_to_index_to_material, Vector<Vector<ModelVertex> > &r_model_vertices) {
 	int32_t total_surface_count = 0;
 	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
 		total_surface_count += mesh_items[mesh_i].mesh->get_surface_count();
 	}
-
 	r_model_vertices.resize(total_surface_count);
 	uv_groups.resize(total_surface_count);
 
@@ -418,81 +364,33 @@ void MeshMergeMeshInstanceWithMaterialAtlas::scale_uvs_by_texture_dimension_larg
 			Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
 			Array mesh = array_mesh->surface_get_arrays(surface_i);
 			Vector<ModelVertex> model_vertices;
-			if (mesh.is_empty()) {
-				mesh_count++;
-				r_model_vertices.write[mesh_count] = model_vertices;
-				continue;
-			}
-			Array vertices = mesh[ArrayMesh::ARRAY_VERTEX];
-			if (vertices.size() == 0) {
-				mesh_count++;
-				r_model_vertices.write[mesh_count] = model_vertices;
-				continue;
-			}
 			Vector<Vector3> vertex_arr = mesh[Mesh::ARRAY_VERTEX];
 			Vector<Vector3> normal_arr = mesh[Mesh::ARRAY_NORMAL];
 			Vector<Vector2> uv_arr = mesh[Mesh::ARRAY_TEX_UV];
 			Vector<int32_t> index_arr = mesh[Mesh::ARRAY_INDEX];
 			Vector<Plane> tangent_arr = mesh[Mesh::ARRAY_TANGENT];
-			Transform3D xform = original_mesh_items[mesh_i].mesh_instance->get_global_transform();
+			Transform3D xform = original_mesh_items[mesh_i].mesh_instance->get_transform();
+			Node3D *parent_node = cast_to<Node3D>(original_mesh_items[mesh_i].mesh_instance->get_parent());
+			for (; parent_node != nullptr; parent_node = cast_to<Node3D>(parent_node->get_parent())) {
+				xform *= parent_node->get_transform();
+			}
 			model_vertices.resize(vertex_arr.size());
+			Vector<Vector2> uvs;
+			uvs.resize(vertex_arr.size());
 			for (int32_t vertex_i = 0; vertex_i < vertex_arr.size(); vertex_i++) {
 				ModelVertex vertex;
 				vertex.pos = xform.xform(vertex_arr[vertex_i]);
-				if (uv_arr.size()) {
-					vertex.uv = uv_arr[vertex_i];
-				}
-				if (normal_arr.size()) {
-					vertex.normal = normal_arr[vertex_i];
-				}
+				vertex.uv = uv_arr[vertex_i];
+				vertex.normal = normal_arr[vertex_i];
 				model_vertices.write[vertex_i] = vertex;
-			}
-			r_model_vertices.write[mesh_count] = model_vertices;
-			mesh_count++;
-		}
-	}
-
-	mesh_count = 0;
-	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
-		for (int32_t j = 0; j < mesh_items[mesh_i].mesh->get_surface_count(); j++) {
-			Array mesh = mesh_items[mesh_i].mesh->surface_get_arrays(j);
-			if (mesh.is_empty()) {
-				uv_groups.push_back(Vector<Vector2>());
-				mesh_count++;
-				continue;
-			}
-			Vector<Vector3> vertices = mesh[ArrayMesh::ARRAY_VERTEX];
-			if (vertices.size() == 0) {
-				mesh_count++;
-				uv_groups.push_back(Vector<Vector2>());
-				continue;
-			}
-			Vector<Vector2> uvs;
-			uvs.resize(vertices.size());
-			Vector<int32_t> indices = mesh[ArrayMesh::ARRAY_INDEX];
-			for (int32_t vertex_i = 0; vertex_i < vertices.size(); vertex_i++) {
-				if (mesh_count >= r_mesh_to_index_to_material.size()) {
-					uvs.resize(0);
-					break;
-				}
 				Array index_to_material = r_mesh_to_index_to_material[mesh_count];
-				if (!index_to_material.size()) {
-					continue;
-				}
-				int32_t index = indices.find(vertex_i);
-				if (index >= index_to_material.size()) {
-					continue;
-				}
+				int32_t index = index_arr.find(vertex_i);
 				ERR_CONTINUE(index == -1);
 				const Ref<Material> material = index_to_material.get(index);
 				Ref<BaseMaterial3D> Node3D_material = material;
 				const Ref<Texture2D> tex = Node3D_material->get_texture(BaseMaterial3D::TextureParam::TEXTURE_ALBEDO);
-				uvs.write[vertex_i] = r_model_vertices[mesh_count][vertex_i].uv;
-				if (tex.is_valid()) {
-					uvs.write[vertex_i].x *= tex->get_width();
-					uvs.write[vertex_i].y *= tex->get_height();
-				}
 			}
+			r_model_vertices.write[mesh_count] = model_vertices;
 			uv_groups.write[mesh_count] = uvs;
 			mesh_count++;
 		}
@@ -535,10 +433,10 @@ Ref<Image> MeshMergeMeshInstanceWithMaterialAtlas::dilate(Ref<Image> source_imag
 	return target_image;
 }
 
-void MeshMergeMeshInstanceWithMaterialAtlas::map_mesh_to_index_to_material(Vector<MeshState> mesh_items, Array &mesh_to_index_to_material, Vector<Ref<Material> > &material_cache) {
+void MeshMergeMeshInstanceWithMaterialAtlas::map_mesh_to_index_to_material(const Vector<MeshState> &p_mesh_items, Array &r_mesh_to_index_to_material, Vector<Ref<Material> > &r_material_cache) {
 	float largest_dimension = 0;
-	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
-		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
+	for (int32_t mesh_i = 0; mesh_i < p_mesh_items.size(); mesh_i++) {
+		Ref<ArrayMesh> array_mesh = p_mesh_items[mesh_i].mesh;
 		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
 			Ref<BaseMaterial3D> mat = array_mesh->surface_get_material(j);
 			Ref<Texture2D> texture = mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
@@ -548,13 +446,13 @@ void MeshMergeMeshInstanceWithMaterialAtlas::map_mesh_to_index_to_material(Vecto
 		}
 	}
 	largest_dimension = MAX(largest_dimension, default_texture_length);
-	for (int32_t mesh_i = 0; mesh_i < mesh_items.size(); mesh_i++) {
-		Ref<ArrayMesh> array_mesh = mesh_items[mesh_i].mesh;
-		array_mesh->lightmap_unwrap(Transform3D(), 1.0f / largest_dimension, true);
+	for (int32_t mesh_i = 0; mesh_i < p_mesh_items.size(); mesh_i++) {
+		Ref<ArrayMesh> array_mesh = p_mesh_items[mesh_i].mesh;
+		array_mesh->lightmap_unwrap(Transform3D(), TEXEL_SIZE, true);
 		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
 			Array mesh = array_mesh->surface_get_arrays(j);
 			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
-			Ref<BaseMaterial3D> material = mesh_items[mesh_i].mesh->surface_get_material(j);
+			Ref<BaseMaterial3D> material = p_mesh_items[mesh_i].mesh->surface_get_material(j);
 			if (material->get_texture(BaseMaterial3D::TEXTURE_ALBEDO).is_null()) {
 				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 				img->fill(material->get_albedo());
@@ -562,16 +460,15 @@ void MeshMergeMeshInstanceWithMaterialAtlas::map_mesh_to_index_to_material(Vecto
 				Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
 				material->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, tex);
 			}
-
-			if (material_cache.find(material) == -1) {
-				material_cache.push_back(material);
+			if (r_material_cache.find(material) == -1) {
+				r_material_cache.push_back(material);
 			}
 			Array materials;
 			materials.resize(indices.size());
 			for (int32_t index_i = 0; index_i < indices.size(); index_i++) {
 				materials[index_i] = material;
 			}
-			mesh_to_index_to_material.push_back(materials);
+			r_mesh_to_index_to_material.push_back(materials);
 		}
 	}
 }
@@ -629,15 +526,8 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::_output(MergeState &state, int p_c
 		Ref<Image> img = dilate(A->value);
 		print_line(vformat("Albedo image size: (%d, %d)", img->get_width(), img->get_height()));
 		img->compress(compress_mode, Image::COMPRESS_SOURCE_SRGB);
-		String path = state.output_path;
-		String base_dir = path.get_base_dir();
-		path = base_dir.path_to_file(path.get_basename().get_file() + "_albedo");
-		Ref<DirAccess> directory = DirAccess::create(DirAccess::AccessType::ACCESS_FILESYSTEM);
-		path += "_" + itos(p_count) + ".res";
 		Ref<ImageTexture> tex = ImageTexture::create_from_image(img);
-		ResourceSaver::save(tex, path);
-		Ref<Texture2D> res = ResourceLoader::load(path, "Texture2D");
-		mat->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, res);
+		mat->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, tex);
 	}
 	mat->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
 	MeshInstance3D *mi = memnew(MeshInstance3D);
@@ -666,16 +556,25 @@ bool MeshMergeMeshInstanceWithMaterialAtlas::MeshState::operator==(const MeshSta
 }
 
 Pair<int, int> MeshMergeMeshInstanceWithMaterialAtlas::calculate_coordinates(const Vector2 &sourceUv, int width, int height) {
-	int sx = static_cast<int>(sourceUv.x * width) % width;
-	int sy = static_cast<int>(sourceUv.y * height) % height;
-
-	if (sx < 0) {
-		sx += width;
+	int sx, sy;
+	if (std::isinf(sourceUv.x)) {
+		sx = 0;
+	} else {
+		float fx = sourceUv.x - std::floor(sourceUv.x);
+		sx = static_cast<int>(fx * width);
+		if (sourceUv.x == 1.0f) {
+			sx = width;
+		}
 	}
-	if (sy < 0) {
-		sy += height;
+	if (std::isinf(sourceUv.y)) {
+		sy = 0;
+	} else {
+		float fy = sourceUv.y - std::floor(sourceUv.y);
+		sy = static_cast<int>(fy * height);
+		if (sourceUv.y == 1.0f) {
+			sy = height;
+		}
 	}
-
 	return Pair<int, int>(sx, sy);
 }
 
