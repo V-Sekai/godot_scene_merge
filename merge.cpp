@@ -376,12 +376,14 @@ void MeshMergeMeshInstanceWithMaterialAtlas::write_uvs(const Vector<MeshState> &
 			for (int32_t vertex_i = 0; vertex_i < vertex_arr.size(); vertex_i++) {
 				ModelVertex vertex_attributes;
 				vertex_attributes.pos = xform.xform(vertex_arr[vertex_i]);
+				ERR_BREAK(normal_arr.is_empty());
 				vertex_attributes.normal = normal_arr[vertex_i];
 				vertex_attributes.normal.normalize();
 				if (vertex_attributes.normal.length_squared() < CMP_EPSILON) {
 					vertex_attributes.normal = Vector3(0, 1, 0);
 				}
 				model_vertices.write[vertex_i] = vertex_attributes;
+				ERR_BREAK(r_mesh_to_index_to_material.is_empty());
 				Array index_to_material = r_mesh_to_index_to_material[mesh_count];
 				int32_t index = index_arr.find(vertex_i);
 				ERR_CONTINUE(index == -1);
