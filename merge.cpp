@@ -65,7 +65,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "scene/resources/surface_tool.h"
 
 #include "thirdparty/misc/rjm_texbleed.h"
-#include "thirdparty/xatlas/xatlas.h"
+#include "thirdparty/misc/xatlas.h"
 #include <time.h>
 #include <algorithm>
 #include <cmath>
