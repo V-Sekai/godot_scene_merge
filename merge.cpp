@@ -441,10 +441,14 @@ void MeshMergeMeshInstanceWithMaterialAtlas::map_mesh_to_index_to_material(const
 		Ref<ArrayMesh> array_mesh = p_mesh_items[mesh_i].mesh;
 		for (int32_t j = 0; j < array_mesh->get_surface_count(); j++) {
 			Ref<BaseMaterial3D> mat = array_mesh->surface_get_material(j);
-			Ref<Texture2D> texture = mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
-			if (texture.is_valid()) {
-				largest_dimension = MAX(texture->get_size().x, texture->get_size().y);
+			if (mat.is_null()) {
+				continue;
 			}
+			Ref<Texture2D> texture = mat->get_texture(BaseMaterial3D::TEXTURE_ALBEDO);
+			if (texture.is_null()) {
+				continue;
+			}
+			largest_dimension = MAX(texture->get_size().x, texture->get_size().y);
 		}
 	}
 	largest_dimension = MAX(largest_dimension, default_texture_length);
@@ -455,6 +459,9 @@ void MeshMergeMeshInstanceWithMaterialAtlas::map_mesh_to_index_to_material(const
 			Array mesh = array_mesh->surface_get_arrays(j);
 			Vector<Vector3> indices = mesh[ArrayMesh::ARRAY_INDEX];
 			Ref<BaseMaterial3D> material = p_mesh_items[mesh_i].mesh->surface_get_material(j);
+			if (material.is_null()) {
+				continue;
+			}
 			if (material->get_texture(BaseMaterial3D::TEXTURE_ALBEDO).is_null()) {
 				Ref<Image> img = Image::create_empty(default_texture_length, default_texture_length, true, Image::FORMAT_RGBA8);
 				img->fill(material->get_albedo());
