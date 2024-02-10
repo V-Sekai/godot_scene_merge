@@ -33,8 +33,8 @@
 #include "modules/scene_merge/merge.h"
 #include "scene/resources/packed_scene.h"
 
-void SceneMerge::merge(Node *p_root_node) {
+Node *SceneMerge::merge(Node *p_root_node) {
 	Ref<MeshMergeMeshInstanceWithMaterialAtlas> repack;
 	repack.instantiate();
-	repack->merge(p_root_node);
+	return repack->merge(p_root_node);
 }

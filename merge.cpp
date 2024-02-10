@@ -46,6 +46,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 
 #include "core/core_bind.h"
 #include "core/error/error_list.h"
+#include "core/error/error_macros.h"
 #include "core/io/image.h"
 #include "core/math/vector2.h"
 #include "core/math/vector3.h"
@@ -56,6 +57,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "modules/scene_merge/mesh_merge_triangle.h"
 #include "scene/3d/node_3d.h"
 #include "scene/animation/animation_player.h"
+#include "scene/main/node.h"
 #include "scene/resources/compressed_texture.h"
 #include "scene/resources/image_texture.h"
 #include "scene/resources/material.h"
@@ -96,11 +98,17 @@ bool MeshMergeMeshInstanceWithMaterialAtlas::set_atlas_texel(void *param, int x,
 }
 
 void MeshMergeMeshInstanceWithMaterialAtlas::_find_all_mesh_instances(Vector<MeshMerge> &r_items, Node *p_current_node, const Node *p_owner) {
+	if (!p_current_node) return; // Add null check for p_current_node
+
 	MeshInstance3D *mi = cast_to<MeshInstance3D>(p_current_node);
 	if (mi && mi->is_visible() && mi->get_mesh().is_valid()) {
 		Ref<Mesh> array_mesh = mi->get_mesh();
 		for (int32_t surface_i = 0; surface_i < array_mesh->get_surface_count(); surface_i++) {
 			Ref<BaseMaterial3D> active_material = mi->get_active_material(surface_i);
+			if (!active_material.is_valid()) {
+				continue;
+			}
+
 			array_mesh->surface_set_material(surface_i, active_material);
 			Array array = array_mesh->surface_get_arrays(surface_i).duplicate(true);
 			MeshState mesh_state;
@@ -109,9 +117,15 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_find_all_mesh_instances(Vector<Mes
 				mesh_state.path = mi->get_path();
 			}
 			mesh_state.mesh_instance = mi;
+
+			if (r_items.is_empty()) {
+				return;
+			}
 			MeshMerge &mesh = r_items.write[r_items.size() - 1];
+
 			mesh.vertex_count += PackedVector3Array(array[ArrayMesh::ARRAY_VERTEX]).size();
 			mesh_state.index_offset = mesh.vertex_count;
+
 			if (mesh_state.is_valid()) {
 				mesh.meshes.push_back(mesh_state);
 			}
@@ -119,7 +133,10 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_find_all_mesh_instances(Vector<Mes
 	}
 
 	for (int32_t child_i = 0; child_i < p_current_node->get_child_count(); child_i++) {
-		_find_all_mesh_instances(r_items, p_current_node->get_child(child_i), p_owner);
+		Node *child = p_current_node->get_child(child_i);
+		if (child != p_owner) { // Add base case to stop recursion
+			_find_all_mesh_instances(r_items, child, p_owner);
+		}
 	}
 }
 
@@ -149,10 +166,12 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::merge(Node *p_root) {
 			num_surfaces += mesh_item.mesh->get_surface_count();
 		}
 		xatlas::PackOptions pack_options;
+		pack_options.bilinear = true;
 		pack_options.padding = 16;
-		pack_options.resolution = 0;
-		pack_options.texelsPerUnit = TEXEL_SIZE;
+		pack_options.texelsPerUnit = 0.0f;
 		pack_options.bruteForce = false;
+		pack_options.blockAlign = true;
+		pack_options.resolution = 2048;
 		Vector<AtlasLookupTexel> atlas_lookup;
 		Error err = _generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, material_cache, pack_options);
 		ERR_FAIL_COND_V(err != OK, p_root);
@@ -237,9 +256,8 @@ void MeshMergeMeshInstanceWithMaterialAtlas::_generate_texture_atlas(MergeState 
 					const uint32_t index = mesh.indexArray[chart.faceArray[face_i] * 3 + l];
 					const xatlas::Vertex &vertex = mesh.vertexArray[index];
 					v[l] = Vector2(vertex.uv[0], vertex.uv[1]);
-
-					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x;
-					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y;
+					args.source_uvs[l].x = state.uvs[mesh_i][vertex.xref].x / MAX(TEXTURE_MINIMUM_SIDE, img->get_width());
+					args.source_uvs[l].y = state.uvs[mesh_i][vertex.xref].y / MAX(TEXTURE_MINIMUM_SIDE, img->get_height());
 				}
 				MeshMergeTriangle tri(v[0], v[1], v[2], Vector3(1, 0, 0), Vector3(0, 1, 0), Vector3(0, 0, 1));
 
@@ -303,17 +321,27 @@ Error MeshMergeMeshInstanceWithMaterialAtlas::_generate_atlas(const int32_t p_nu
 	if (r_meshes.is_empty()) {
 		return ERR_SKIP;
 	}
-	uint32_t mesh_count = 0;
 	for (int32_t mesh_i = 0; mesh_i < r_meshes.size(); mesh_i++) {
 		for (int32_t j = 0; j < r_meshes[mesh_i].mesh->get_surface_count(); j++) {
 			Array mesh = r_meshes[mesh_i].mesh->surface_get_arrays(j);
 			Array indices = mesh[ArrayMesh::ARRAY_INDEX];
-			xatlas::MeshDecl mesh_declaration;
+			xatlas::UvMeshDecl mesh_declaration;
 			mesh_declaration.vertexCount = PackedVector2Array(mesh[Mesh::ARRAY_INDEX]).size() / 2;
-			mesh_declaration.vertexPositionData = PackedVector3Array(mesh[Mesh::ARRAY_VERTEX]).ptr();
-			mesh_declaration.vertexPositionStride = sizeof(float) * 3;
-			mesh_declaration.vertexUvData = PackedVector2Array(r_uvs[mesh_count]).ptr();
-			mesh_declaration.vertexUvStride = sizeof(float) * 2;
+
+			PackedVector3Array original_data = PackedVector3Array(mesh[Mesh::ARRAY_VERTEX]);
+
+			PackedFloat32Array float_data;
+			float_data.resize(original_data.size() * 3);
+
+			for (int i = 0; i < original_data.size(); ++i) {
+				Vector3 vertex = original_data[i];
+				float_data.set(i * 3 + 0, static_cast<float>(vertex.x));
+				float_data.set(i * 3 + 1, static_cast<float>(vertex.y));
+				float_data.set(i * 3 + 2, static_cast<float>(vertex.z));
+			}
+
+			mesh_declaration.vertexUvData = float_data.ptr();
+			mesh_declaration.vertexStride = sizeof(float) * 3;
 			mesh_declaration.indexFormat = xatlas::IndexFormat::UInt32;
 			Vector<int32_t> mesh_indices = mesh[Mesh::ARRAY_INDEX];
 			Vector<uint32_t> indexes;
@@ -330,15 +358,12 @@ Error MeshMergeMeshInstanceWithMaterialAtlas::_generate_atlas(const int32_t p_nu
 			}
 			mesh_declaration.indexCount = indexes.size();
 			mesh_declaration.indexData = indexes.ptr();
-			mesh_declaration.indexFormat = xatlas::IndexFormat::UInt32;
 			mesh_declaration.faceMaterialData = materials.ptr();
 			mesh_declaration.indexOffset = 0;
-			xatlas::AddMeshError error = xatlas::AddMesh(r_atlas, mesh_declaration);
+			xatlas::AddMeshError error = xatlas::AddUvMesh(r_atlas, mesh_declaration);
 			print_verbose(vformat("Adding mesh %d: %s", mesh_i, xatlas::StringForEnum(error)));
-			mesh_count++;
 		}
 	}
-
 	xatlas::ChartOptions chart_options;
 	chart_options.useInputMeshUvs = true;
 	chart_options.fixWinding = true;
@@ -387,11 +412,15 @@ void MeshMergeMeshInstanceWithMaterialAtlas::write_uvs(const Vector<MeshState> &
 				Array index_to_material = r_mesh_to_index_to_material[mesh_count];
 				int32_t index = index_arr.find(vertex_i);
 				ERR_CONTINUE(index == -1);
+				uvs.write[vertex_i] = uv_arr[vertex_i];
 				const Ref<Material> material = index_to_material.get(index);
 				Ref<BaseMaterial3D> Node3D_material = material;
 				const Ref<Texture2D> tex = Node3D_material->get_texture(BaseMaterial3D::TextureParam::TEXTURE_ALBEDO);
 				if (tex.is_valid()) {
-					vertex_attributes.uv = uv_arr[vertex_i];
+					int32_t width = (float)MAX(TEXTURE_MINIMUM_SIDE, tex->get_width());
+					int32_t height = (float)MAX(TEXTURE_MINIMUM_SIDE, tex->get_height());
+					uvs.write[vertex_i].x *= width;
+					uvs.write[vertex_i].y *= height;
 				}
 			}
 			r_model_vertices.write[mesh_count] = model_vertices;
@@ -508,22 +537,36 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::_output(MergeState &state, int p_c
 		st->begin(Mesh::PRIMITIVE_TRIANGLES);
 		const xatlas::Mesh &mesh = state.atlas->meshes[mesh_i];
 		print_line(vformat("Mesh %d: vertexCount=%d, indexCount=%d", mesh_i, mesh.vertexCount, mesh.indexCount));
-		for (uint32_t v = 0; v < mesh.vertexCount; v++) {
-			const xatlas::Vertex vertex = mesh.vertexArray[v];
-			const ModelVertex &sourceVertex = state.model_vertices[mesh_i][vertex.xref];
-			Vector2 uv = Vector2(vertex.uv[0] / state.atlas->width, vertex.uv[1] / state.atlas->height);
-			st->set_uv(uv);
-			st->set_normal(sourceVertex.normal);
-			st->set_color(Color(1.0f, 1.0f, 1.0f));
-			st->add_vertex(sourceVertex.pos);
+
+		uint32_t max_vertices = 32 * 1024;
+		uint32_t num_parts = (mesh.vertexCount / max_vertices) + 1;
+
+		for (uint32_t part = 0; part < num_parts; part++) {
+			uint32_t start = part * max_vertices;
+			uint32_t end = MIN((part + 1) * max_vertices, mesh.vertexCount);
+
+			for (uint32_t v = start; v < end; v++) {
+				const xatlas::Vertex vertex = mesh.vertexArray[v];
+				ERR_BREAK_MSG(vertex.xref < 0 || vertex.xref >= state.model_vertices[mesh_i].size(), "Vertex reference not found.");
+				const ModelVertex &sourceVertex = state.model_vertices[mesh_i][vertex.xref];
+				Vector2 uv = Vector2(vertex.uv[0] / state.atlas->width, vertex.uv[1] / state.atlas->height);
+				st->set_uv(uv);
+				st->set_normal(sourceVertex.normal);
+				st->set_color(Color(1.0f, 1.0f, 1.0f));
+				st->add_vertex(sourceVertex.pos);
+			}
+
+			for (uint32_t i = 0; i < mesh.indexCount; i++) {
+				uint32_t index = mesh.indexArray[i];
+				if (index >= start && index < end) {
+					st->add_index(index - start);
+				}
+			}
+
+			st->generate_tangents();
+			Ref<ArrayMesh> array_mesh = st->commit();
+			st_all->append_from(array_mesh, 0, Transform3D());
 		}
-		for (uint32_t f = 0; f < mesh.indexCount; f++) {
-			const uint32_t index = mesh.indexArray[f];
-			st->add_index(index);
-		}
-		st->generate_tangents();
-		Ref<ArrayMesh> array_mesh = st->commit();
-		st_all->append_from(array_mesh, 0, Transform3D());
 	}
 	Ref<StandardMaterial3D> mat;
 	mat.instantiate();
@@ -546,17 +589,12 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::_output(MergeState &state, int p_c
 	mi->set_mesh(array_mesh);
 	mi->set_name(state.p_name);
 	Transform3D root_xform;
-	Node3D *node_3d = cast_to<Node3D>(state.p_root);
-	if (node_3d) {
-		root_xform = node_3d->get_transform();
-	}
+	Node3D *node_3d = memnew(Node3D);
 	mi->set_transform(root_xform.affine_inverse());
 	array_mesh->surface_set_material(0, mat);
-	state.p_root->add_child(mi, true);
-	if (mi != state.p_root) {
-		mi->set_owner(state.p_root);
-	}
-	return state.p_root;
+	node_3d->add_child(mi, true);
+	mi->set_owner(node_3d);
+	return node_3d;
 }
 
 bool MeshMergeMeshInstanceWithMaterialAtlas::MeshState::operator==(const MeshState &rhs) const {
@@ -572,19 +610,13 @@ Pair<int, int> MeshMergeMeshInstanceWithMaterialAtlas::calculate_coordinates(con
 		sx = 0;
 	} else {
 		float fx = sourceUv.x - std::floor(sourceUv.x);
-		sx = static_cast<int>(fx * width);
-		if (sourceUv.x == 1.0f) {
-			sx = width;
-		}
+		sx = static_cast<int>(fx * width) % width;
 	}
 	if (std::isinf(sourceUv.y)) {
 		sy = 0;
 	} else {
 		float fy = sourceUv.y - std::floor(sourceUv.y);
-		sy = static_cast<int>(fy * height);
-		if (sourceUv.y == 1.0f) {
-			sy = height;
-		}
+		sy = static_cast<int>(fy * height) % height;
 	}
 	return Pair<int, int>(sx, sy);
 }

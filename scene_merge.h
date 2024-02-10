@@ -61,7 +61,7 @@ private:
 	GDCLASS(SceneMerge, RefCounted);
 
 public:
-	void merge(Node *p_root_node);
+	Node *merge(Node *p_root_node);
 };
 
 #endif // SCENE_MERGE_H

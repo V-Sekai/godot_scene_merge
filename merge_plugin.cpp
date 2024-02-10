@@ -1,4 +1,6 @@
 #include "merge_plugin.h"
+#include "core/os/memory.h"
+#include <cstdint>
 
 SceneMergePlugin::~SceneMergePlugin() {
 	EditorNode::get_singleton()->remove_tool_menu_item("Merge Scene");
@@ -10,7 +12,8 @@ void SceneMergePlugin::_action() {
 		EditorNode::get_singleton()->show_accept(TTR("This operation can't be done without a scene."), TTR("OK"));
 		return;
 	}
-	scene_optimize->merge(node);
+	node->replace_by(scene_optimize->merge(node));
+	node->queue_free();
 	EditorFileSystem::get_singleton()->scan_changes();
 }
 

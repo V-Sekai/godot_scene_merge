@@ -82,6 +82,7 @@ private:
 		Vector3 normal;
 		Vector2 uv;
 	};
+	const int32_t TEXTURE_MINIMUM_SIDE = 512;
 	struct MeshState {
 		Ref<Mesh> mesh;
 		NodePath path;
