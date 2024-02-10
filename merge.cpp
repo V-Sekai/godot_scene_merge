@@ -65,7 +65,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "scene/resources/surface_tool.h"
 
 #include "thirdparty/misc/rjm_texbleed.h"
-#include "thirdparty/misc/xatlas.h"
+#include "thirdparty/xatlas/xatlas.h"
 #include <time.h>
 #include <algorithm>
 #include <cmath>
@@ -198,6 +198,7 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::merge(Node *p_root) {
 		p_root = _output(state, p_index);
 		xatlas::Destroy(atlas);
 	}
+	return p_root;
 }
 
 void MeshMergeMeshInstanceWithMaterialAtlas::_generate_texture_atlas(MergeState &state, String texture_type) {

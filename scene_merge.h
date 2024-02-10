@@ -54,7 +54,7 @@ Copyright NVIDIA Corporation 2006 -- Ignacio Castano <icastano@nvidia.com>
 #include "scene/3d/mesh_instance_3d.h"
 #include "scene/main/node.h"
 
-#include "thirdparty/misc/xatlas.h"
+#include "thirdparty/xatlas/xatlas.h"
 
 class SceneMerge : public RefCounted {
 private:
