@@ -153,7 +153,7 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::merge(Node *p_root) {
 	for (int32_t items_i = 0; items_i < mesh_merge_state.mesh_items.size(); items_i++) {
 		int32_t p_index = items_i;
 		Vector<MeshState> mesh_items = mesh_merge_state.mesh_items[p_index].meshes;
-		Node *p_root = mesh_merge_state.root->duplicate();
+		Node *root = mesh_merge_state.root->duplicate();
 		Array mesh_to_index_to_material;
 		Vector<Ref<Material> > material_cache;
 		map_mesh_to_index_to_material(mesh_items, mesh_to_index_to_material, material_cache);
@@ -174,18 +174,18 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::merge(Node *p_root) {
 		pack_options.resolution = 2048;
 		Vector<AtlasLookupTexel> atlas_lookup;
 		Error err = _generate_atlas(num_surfaces, uv_groups, atlas, mesh_items, material_cache, pack_options);
-		ERR_FAIL_COND_V(err != OK, p_root);
+		ERR_FAIL_COND_V(err != OK, root);
 		atlas_lookup.resize(atlas->width * atlas->height);
 		HashMap<String, Ref<Image> > texture_atlas;
 		HashMap<int32_t, MaterialImageCache> material_image_cache;
 		MergeState state{
-			p_root,
+			root,
 			atlas,
 			mesh_items,
 			mesh_to_index_to_material,
 			uv_groups,
 			model_vertices,
-			p_root->get_name(),
+			root->get_name(),
 			pack_options,
 			atlas_lookup,
 			material_cache,
@@ -214,7 +214,7 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::merge(Node *p_root) {
 #endif
 		}
 		_generate_texture_atlas(state, "albedo");
-		p_root = _output(state, p_index);
+		root = _output(state, p_index);
 		xatlas::Destroy(atlas);
 	}
 	return p_root;
@@ -547,7 +547,7 @@ Node *MeshMergeMeshInstanceWithMaterialAtlas::_output(MergeState &state, int p_c
 
 			for (uint32_t v = start; v < end; v++) {
 				const xatlas::Vertex vertex = mesh.vertexArray[v];
-				ERR_BREAK_MSG(vertex.xref < 0 || vertex.xref >= state.model_vertices[mesh_i].size(), "Vertex reference not found.");
+				ERR_BREAK_MSG(vertex.xref < 0 || vertex.xref >= static_cast<uint32_t>(state.model_vertices[mesh_i].size()), "Vertex reference not found.");
 				const ModelVertex &sourceVertex = state.model_vertices[mesh_i][vertex.xref];
 				Vector2 uv = Vector2(vertex.uv[0] / state.atlas->width, vertex.uv[1] / state.atlas->height);
 				st->set_uv(uv);
