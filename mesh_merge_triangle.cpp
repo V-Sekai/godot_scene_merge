@@ -148,16 +148,21 @@ bool MeshMergeTriangle::computeDeltas() {
 	Vector2 e1 = v2 - v1;
 	Vector3 de0 = t3 - t1;
 	Vector3 de1 = t2 - t1;
-	float denom = 1.0f / (e0.y * e1.x - e1.y * e0.x);
-	if (!Math::is_finite(denom)) {
+
+	float denom = e0.y * e1.x - e1.y * e0.x;
+	if (denom == 0.0f || !Math::is_finite(denom)) {
 		return false;
 	}
-	float lambda1 = -e1.y * denom;
-	float lambda2 = e0.y * denom;
-	float lambda3 = e1.x * denom;
-	float lambda4 = -e0.x * denom;
+
+	float denom_inv = 1.0f / denom;
+	float lambda1 = -e1.y * denom_inv;
+	float lambda2 = e0.y * denom_inv;
+	float lambda3 = e1.x * denom_inv;
+	float lambda4 = -e0.x * denom_inv;
+
 	dx = de0 * lambda1 + de1 * lambda2;
 	dy = de0 * lambda3 + de1 * lambda4;
+
 	return true;
 }
 
