@@ -119,7 +119,7 @@ bool MeshMergeTriangle::computeDeltas() {
 	Vector3 de0 = t3 - t1;
 	Vector3 de1 = t2 - t1;
 	float denom = 1.0f / (e0.y * e1.x - e1.y * e0.x);
-	if (!std::isfinite(denom)) {
+	if (!Math::is_finite(denom)) {
 		return false;
 	}
 	float lambda1 = -e1.y * denom;
